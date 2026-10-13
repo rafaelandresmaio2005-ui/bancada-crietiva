@@ -1,0 +1,925 @@
+<!doctype html><html lang="pt"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"></head><body style="margin:0">
+<title>Bancada criETiva</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Figtree:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: bancada de trabalho — paleta de blocos à esquerda, tapete quadriculado (1 quadrícula = bloco 30×30 mm) ao centro, ficha do bloco à direita */
+:root{
+  --bg:#e4e9e1; --mat:#dfe6da; --mat-line:#c7d1c1; --mat-major:#b3c0ad;
+  --panel:#f6f7f3; --line:#d3dacd; --fg:#1b221e; --muted:#5d6a62;
+  --ink:#23302a; --trace:#8a6a2c; --gold:#c39a3e;
+  --accent:#1d6a86; --accent-ink:#ffffff; --accent-soft:#d5e7ee;
+  --tile-lig:#f5f3ee; --tile-pas:#cde5dd; --tile-atv:#f2dfb4; --tile-ali:#f0cbc1;
+  --tile-edge:#9aa79e; --chip:#2b3530; --chip-ink:#9fb3a8;
+  --hot:#f08c6e; --warn:#b4471f; --warn-soft:#f6dccf; --ok:#2f7d4f;
+  --f-disp:"Bricolage Grotesque", "Trebuchet MS", sans-serif;
+  --f-body:"Figtree", "Segoe UI", system-ui, sans-serif;
+  --f-mono:"JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#121915; --mat:#16201a; --mat-line:#223028; --mat-major:#2c3c33;
+  --panel:#19221d; --line:#2a362f; --fg:#e2e9e4; --muted:#93a39a;
+  --ink:#dfe8e2; --trace:#c9a25a; --gold:#d6ad55;
+  --accent:#5fb4d2; --accent-ink:#0d1a20; --accent-soft:#1d3640;
+  --tile-lig:#3a423d; --tile-pas:#244640; --tile-atv:#4b3e23; --tile-ali:#4d2e28;
+  --tile-edge:#56645b; --chip:#0f1512; --chip-ink:#6f8a7c;
+  --hot:#c85a3c; --warn:#f08c64; --warn-soft:#3b231b; --ok:#6cc48f; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#121915; --mat:#16201a; --mat-line:#223028; --mat-major:#2c3c33;
+  --panel:#19221d; --line:#2a362f; --fg:#e2e9e4; --muted:#93a39a;
+  --ink:#dfe8e2; --trace:#c9a25a; --gold:#d6ad55;
+  --accent:#5fb4d2; --accent-ink:#0d1a20; --accent-soft:#1d3640;
+  --tile-lig:#3a423d; --tile-pas:#244640; --tile-atv:#4b3e23; --tile-ali:#4d2e28;
+  --tile-edge:#56645b; --chip:#0f1512; --chip-ink:#6f8a7c;
+  --hot:#c85a3c; --warn:#f08c64; --warn-soft:#3b231b; --ok:#6cc48f; color-scheme:dark}
+
+html,body{height:100%}
+body{background:var(--bg);color:var(--fg);font-family:var(--f-body);font-size:14px}
+*{box-sizing:border-box}
+button,select,input,textarea{font:inherit;color:inherit}
+.app{display:grid;grid-template-columns:212px minmax(0,1fr) 290px;grid-template-rows:auto minmax(0,1fr);height:100%}
+
+header{grid-column:1/-1;display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px;padding:10px 16px;background:var(--panel);border-bottom:1px solid var(--line)}
+.brand{display:flex;align-items:baseline;gap:8px;margin-right:auto}
+.brand h1{font-family:var(--f-disp);font-weight:700;font-size:20px;margin:0;letter-spacing:-.01em}
+.brand span{font-size:12px;color:var(--muted)}
+.group{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.btn{border:1px solid var(--line);background:var(--bg);border-radius:8px;padding:6px 10px;cursor:pointer;font-size:13px;line-height:1.2}
+.btn:hover{border-color:var(--accent)}
+.btn:focus-visible,.seg button:focus-visible,select:focus-visible,.pal-item:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.btn[aria-pressed="true"]{background:var(--accent-soft);border-color:var(--accent)}
+.btn:disabled{opacity:.45;cursor:default}
+.btn.danger{color:var(--warn)}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:9px;overflow:hidden;background:var(--bg)}
+.seg button{border:0;background:none;padding:6px 12px;cursor:pointer;font-size:13px;font-weight:500}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
+select{border:1px solid var(--line);background:var(--bg);border-radius:8px;padding:6px 8px;font-size:13px}
+
+.palette{overflow:auto;padding:12px 12px 16px 16px;border-right:1px solid var(--line);background:var(--panel)}
+.pal-cat{margin:6px 0 4px;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:600;display:flex;align-items:center;gap:6px}
+.pal-cat i{width:9px;height:9px;border-radius:2px;border:1px solid var(--tile-edge);display:inline-block}
+.pal-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:10px}
+.pal-item{display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 4px 5px;border:1px solid transparent;border-radius:8px;background:none;cursor:grab;touch-action:manipulation;user-select:none;-webkit-user-select:none}
+.pal-item:hover{border-color:var(--line);background:var(--bg)}
+.pal-item[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft)}
+.pal-item svg{width:44px;height:44px;pointer-events:none}
+.pal-item span{font-size:11.5px;text-align:center;line-height:1.15}
+.pal-hint{font-size:12px;color:var(--muted);line-height:1.45;margin:4px 0 0}
+
+.stage{display:flex;flex-direction:column;min-width:0;min-height:0}
+.canvas{flex:1;overflow:auto;padding:14px;min-height:0}
+#board{display:block;touch-action:none;user-select:none;-webkit-user-select:none}
+.status{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center;padding:7px 16px;border-top:1px solid var(--line);background:var(--panel);font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.status .mono{font-family:var(--f-mono)}
+.chip{display:inline-flex;align-items:center;gap:5px;padding:2px 8px;border-radius:999px;font-size:12px}
+.chip.warn{background:var(--warn-soft);color:var(--warn);font-weight:500}
+.chip.ok{color:var(--ok)}
+
+.inspector{overflow:auto;padding:14px 16px 18px;border-left:1px solid var(--line);background:var(--panel)}
+.inspector h2{font-family:var(--f-disp);font-weight:600;font-size:18px;margin:0 0 2px;text-wrap:balance}
+.insp-cat{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.insp-desc{line-height:1.5;margin:8px 0 12px;color:var(--fg)}
+.field{display:flex;flex-direction:column;gap:4px;margin:0 0 10px}
+.field label{font-size:12px;color:var(--muted);font-weight:500}
+.field input[type=range]{width:100%;accent-color:var(--accent)}
+.readings{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--bg);margin:4px 0 12px;font-variant-numeric:tabular-nums}
+.readings dt{color:var(--muted);font-size:12.5px}
+.readings dd{margin:0;text-align:right;font-family:var(--f-mono);font-size:13px}
+.actions{display:flex;flex-wrap:wrap;gap:6px}
+.keys{margin:14px 0 0;padding:0;list-style:none;display:grid;gap:5px;font-size:12.5px;color:var(--muted)}
+kbd{font-family:var(--f-mono);font-size:11px;border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:0 5px;background:var(--bg);color:var(--fg)}
+.tips{line-height:1.5;margin:6px 0 0;padding-left:18px}
+.tips li{margin-bottom:4px}
+
+.modal[hidden]{display:none}
+.modal{position:fixed;inset:0;background:rgba(10,16,13,.45);display:flex;align-items:center;justify-content:center;padding:16px;z-index:10}
+.modal-box{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px;width:min(560px,100%);max-height:90%;overflow:auto;display:flex;flex-direction:column;gap:10px}
+.modal-box h3{margin:0;font-family:var(--f-disp);font-weight:600;font-size:18px}
+.modal-box p{margin:0;color:var(--muted);line-height:1.45}
+.modal-box textarea{width:100%;min-height:200px;font-family:var(--f-mono);font-size:12px;border:1px solid var(--line);border-radius:8px;background:var(--bg);padding:8px;resize:vertical}
+
+/* SVG */
+.tile{stroke:var(--tile-edge);stroke-width:1.2}
+.t-lig{fill:var(--tile-lig)} .t-pas{fill:var(--tile-pas)} .t-atv{fill:var(--tile-atv)} .t-ali{fill:var(--tile-ali)}
+.lbl{font-family:var(--f-mono);font-size:8.5px;fill:var(--ink);opacity:.85}
+.ruler{font-family:var(--f-mono);font-size:9px;fill:var(--muted)}
+.tip-box{fill:var(--panel);stroke:var(--line)}
+.tip-txt{font-family:var(--f-mono);font-size:11px;fill:var(--fg)}
+
+@media (max-width: 960px){
+  .app{grid-template-columns:minmax(0,1fr);grid-template-rows:auto auto auto auto;height:auto}
+  .palette{border-right:0;border-bottom:1px solid var(--line);display:flex;gap:14px;overflow-x:auto;padding:10px 16px}
+  .pal-sec{flex:none}
+  .pal-grid{grid-template-columns:repeat(6,auto);margin:0}
+  .pal-hint{display:none}
+  .stage{height:68vh}
+  .inspector{border-left:0;border-top:1px solid var(--line)}
+}
+@media (prefers-reduced-motion: reduce){*{transition:none!important}}
+</style>
+
+<div class="app">
+  <header>
+    <div class="brand"><h1>Bancada criETiva</h1><span>monta circuitos com blocos 30 × 30 mm</span></div>
+    <div class="seg" role="group" aria-label="Modo">
+      <button id="m-edit" aria-pressed="true" title="Montar (T)">Montar</button>
+      <button id="m-test" aria-pressed="false" title="Testar (T)">Testar</button>
+    </div>
+    <div class="group">
+      <button class="btn" id="b-undo" title="Desfazer (Ctrl+Z)">Desfazer</button>
+      <button class="btn" id="b-redo" title="Refazer (Ctrl+Shift+Z)">Refazer</button>
+    </div>
+    <div class="group">
+      <select id="ex" aria-label="Exemplos"><option value="">Exemplos…</option></select>
+      <button class="btn" id="b-file">Guardar / abrir</button>
+      <button class="btn danger" id="b-clear">Limpar</button>
+    </div>
+    <div class="group">
+      <button class="btn" id="b-volt" aria-pressed="true" title="Colorir as ligações pela tensão">Tensões</button>
+      <button class="btn" id="b-sound" aria-pressed="false" title="Som do besouro">Som</button>
+      <button class="btn" id="b-pause" aria-pressed="false">Pausar</button>
+      <button class="btn" id="b-reset" title="Reinicia o tempo e descarrega os condensadores">Reiniciar</button>
+    </div>
+    <div class="group">
+      <button class="btn" id="z-out" aria-label="Afastar">−</button>
+      <button class="btn" id="z-fit">Ajustar</button>
+      <button class="btn" id="z-in" aria-label="Aproximar">+</button>
+    </div>
+  </header>
+
+  <aside class="palette" id="palette" aria-label="Blocos"></aside>
+
+  <main class="stage">
+    <div class="canvas" id="canvas">
+      <svg id="board" xmlns="http://www.w3.org/2000/svg">
+        <defs id="defs"></defs>
+        <g id="static"></g>
+        <g id="dyn"></g>
+      </svg>
+    </div>
+    <div class="status" id="status"></div>
+  </main>
+
+  <aside class="inspector" id="inspector" aria-live="polite"></aside>
+</div>
+
+<div class="modal" id="modal" hidden>
+  <div class="modal-box" role="dialog" aria-labelledby="mt">
+    <h3 id="mt">Guardar ou abrir circuito</h3>
+    <p>O circuito fica guardado automaticamente neste navegador. Para o partilhar com a equipa, copia o texto abaixo e cola-o num ficheiro <code>.json</code>. Para abrir, cola um circuito aqui ou escolhe um ficheiro.</p>
+    <textarea id="json" spellcheck="false" aria-label="Circuito em JSON"></textarea>
+    <div class="actions">
+      <button class="btn" id="j-copy">Copiar</button>
+      <button class="btn" id="j-load">Abrir este texto</button>
+      <label class="btn" for="j-file" style="cursor:pointer">Escolher ficheiro…</label>
+      <input type="file" id="j-file" accept=".json,application/json" hidden>
+      <span style="flex:1"></span>
+      <button class="btn" id="j-close">Fechar</button>
+    </div>
+    <p id="j-msg"></p>
+  </div>
+</div>
+
+<script>
+"use strict";
+/* ============ Constantes ============ */
+const S = 60, GW = 18, GH = 11, RUL = 26;
+const FACE_PT = [[0,-27],[27,0],[0,27],[-27,0]];
+const DIR = [[0,-1],[1,0],[0,1],[-1,0]];
+const VT = 0.025852;
+
+const LEDC = {
+  red:{n:'Vermelho', c:'#ff3b2f', vf:1.9},
+  yellow:{n:'Amarelo', c:'#ffd21f', vf:2.0},
+  green:{n:'Verde', c:'#2fd65b', vf:2.1},
+  blue:{n:'Azul', c:'#3a8bff', vf:2.9},
+  white:{n:'Branco', c:'#eef3ff', vf:3.0},
+};
+
+const CATS = [['lig','Ligações','lig'],['ali','Alimentação','ali'],['pas','Passivos','pas'],['ctl','Controlo','pas'],['sem','Semicondutores','atv'],['out','Saídas','atv']];
+const FAM = Object.fromEntries(CATS.map(c=>[c[0],c[2]]));
+const CATNAME = Object.fromEntries(CATS.map(c=>[c[0],c[1]]));
+
+const TYPES = {
+  wire:{n:'Fio reto',cat:'lig',t:[['',[1,3]]],d:'Conduz a corrente entre duas faces opostas. Ao longo do fio a tensão é sempre a mesma.'},
+  corner:{n:'Fio em L',cat:'lig',t:[['',[1,2]]],d:'Faz a ligação dobrar 90°. Roda-o com R para escolher a direção.'},
+  tee:{n:'Fio em T',cat:'lig',t:[['',[1,2,3]]],d:'Junta três faces no mesmo ponto. Serve para dividir o circuito em ramos paralelos.'},
+  cross:{n:'Fio em cruz',cat:'lig',t:[['',[0,1,2,3]]],d:'Junta as quatro faces no mesmo ponto (nó).'},
+  bridge:{n:'Cruzamento',cat:'lig',t:[['horizontal',[1,3]],['vertical',[0,2]]],d:'Dois fios independentes que se cruzam sem se tocarem.'},
+  battery:{n:'Bateria',cat:'ali',t:[['−',[3]],['+',[1]]],p:{v:3.7},d:'Fonte de energia. A corrente sai pelo polo + e volta pelo polo −. Tem uma pequena resistência interna de 0,3 Ω, por isso um curto-circuito puxa vários amperes.'},
+  mcu:{n:'Microcontrolador',cat:'ali',t:[['GND',[3]],['OUT',[1]]],p:{hz:1},d:'Corre um programa “blink”: liga e desliga a saída OUT (3,3 V) à frequência escolhida. A face GND é a referência de 0 V.'},
+  resistor:{n:'Resistência',cat:'pas',t:[['A',[3]],['B',[1]]],p:{r:220},d:'Limita a corrente. Lei de Ohm: I = V / R. Se dissipar mais de 0,25 W aquece (fica vermelha).'},
+  capacitor:{n:'Condensador',cat:'pas',t:[['+',[3]],['−',[1]]],p:{c:470e-6},d:'Guarda carga elétrica: carrega enquanto tem tensão aos terminais e devolve a energia depois. É eletrolítico, respeita o polo +. O preenchimento mostra a carga.'},
+  switch:{n:'Interruptor',cat:'ctl',t:[['A',[3]],['B',[1]]],p:{on:true},d:'Abre ou fecha o circuito. No modo Testar, clica no bloco para mudar de estado.'},
+  button:{n:'Botão',cat:'ctl',t:[['A',[3]],['B',[1]]],d:'Só fecha o circuito enquanto está pressionado. No modo Testar, mantém o clique sobre o bloco.'},
+  pot:{n:'Potenciómetro',cat:'ctl',t:[['A',[3]],['B',[1]],['cursor',[2]]],p:{r:10000,pos:0.3},d:'Resistência variável com três terminais. O cursor (face lateral) divide a resistência total em duas partes. No modo Testar, arrasta na horizontal sobre o bloco.'},
+  ldr:{n:'LDR',cat:'ctl',t:[['A',[3]],['B',[1]]],p:{light:0.9},d:'Fotorresistência (tipo GL5528): a resistência desce quando há mais luz. Com sol direto fica em poucas centenas de ohms; no escuro chega a 1 MΩ. No modo Testar, arrasta na horizontal sobre o bloco para mudar a luz.'},
+  diode:{n:'Díodo',cat:'sem',t:[['ânodo',[3]],['cátodo',[1]]],d:'Só deixa passar corrente num sentido, do ânodo para o cátodo (o lado da barra). Consome cerca de 0,7 V.'},
+  led:{n:'LED',cat:'sem',t:[['ânodo',[3]],['cátodo',[1]]],p:{color:'red'},d:'Díodo que emite luz. Precisa de uma resistência em série: acima de cerca de 30 mA queima.'},
+  npn:{n:'Transístor NPN',cat:'sem',t:[['coletor',[0]],['base',[3]],['emissor',[2]]],d:'Transístor NPN (tipo BC547). Uma corrente pequena na base controla uma corrente até 200 vezes maior entre o coletor e o emissor.'},
+  lamp:{n:'Lâmpada',cat:'out',t:[['A',[3]],['B',[1]]],d:'Lâmpada incandescente pequena (25 Ω). Brilha mais quanto maior for a potência.'},
+  motor:{n:'Motor',cat:'out',t:[['A',[3]],['B',[1]]],d:'Motor DC. Roda mais depressa com mais tensão e muda de sentido se trocares a polaridade.'},
+  buzzer:{n:'Besouro',cat:'out',t:[['+',[3]],['−',[1]]],d:'Besouro ativo: apita quando recebe mais de 1,5 V no sentido certo (+ do lado marcado). Liga o Som para o ouvir.'},
+};
+
+const PROPS = {
+  resistor:[{k:'r',l:'Resistência',o:[10,47,100,220,330,470,1000,2200,4700,10000,47000,100000].map(v=>[v,si(v,'Ω')])}],
+  led:[{k:'color',l:'Cor',o:Object.entries(LEDC).map(([k,v])=>[k,v.n+' ('+num(v.vf,2)+' V)'])}],
+  capacitor:[{k:'c',l:'Capacidade',o:[10e-6,100e-6,470e-6,1000e-6,2200e-6].map(v=>[v,si(v,'F')])}],
+  battery:[{k:'v',l:'Tensão',o:[[3.7,'3,7 V (Li-ion)'],[5,'5 V'],[9,'9 V']]}],
+  pot:[{k:'r',l:'Resistência total',o:[1000,10000,100000].map(v=>[v,si(v,'Ω')])},{k:'pos',l:'Posição do cursor',range:1,f:v=>Math.round(v*100)+' %'}],
+  ldr:[{k:'light',l:'Luz ambiente',range:1,f:v=>luxTxt(v)+' → '+si(ldrR(v),'Ω')}],
+  mcu:[{k:'hz',l:'Frequência',o:[[0.5,'0,5 Hz'],[1,'1 Hz'],[2,'2 Hz'],[5,'5 Hz']]}],
+};
+
+/* LDR: R = 10 kΩ·(E/10 lx)^−0,7, limitada a [100 Ω, 1 MΩ]; cursor 0…1 → 0,01…1000 lx (escala log) */
+function ldrLux(s){ return Math.pow(10,5*s-2); }
+function luxTxt(s){ const v=ldrLux(s); return (v<1?v.toFixed(2):v<10?v.toFixed(1):String(Math.round(v))).replace('.',',')+' lx'; }
+function ldrR(s){ return Math.min(1e6,Math.max(100,1e4*Math.pow(ldrLux(s)/10,-0.7))); }
+
+/* ============ Formatação ============ */
+function num(v,d){ return v.toFixed(d).replace('.',','); }
+function si(v,u,dig=3){
+  if(!isFinite(v)) return '—';
+  const a=Math.abs(v);
+  if(a<1e-12) return '0 '+u;
+  const P=[[1e6,'M'],[1e3,'k'],[1,''],[1e-3,'m'],[1e-6,'µ'],[1e-9,'n'],[1e-12,'p']];
+  for(const [m,p] of P){
+    if(a>=m*0.99995){
+      let s=(v/m).toPrecision(dig);
+      if(s.includes('e')) s=String(Math.round(v/m));
+      if(s.includes('.')) s=s.replace(/0+$/,'').replace(/\.$/,'');
+      return s.replace('.',',')+' '+p+u;
+    }
+  }
+  return v.toExponential(2)+' '+u;
+}
+
+/* ============ Estado ============ */
+let state = {blocks:[], nextId:1};
+let sel = null, mode = 'edit', tool = null, showV = true, sound = false, paused = false, zoom = 1;
+let undoS = [], redoS = [];
+let topo = null, topoDirty = true;
+const rt = {V:new Float64Array(0), t:0, vc:new Map(), vd:new Map(), out:new Map(), pressed:new Set(), ang:new Map(), burnT:new Map(), warns:[], iters:0, conv:true};
+let hover = null, drag = null, ptr = null;
+
+const $ = id => document.getElementById(id);
+const key = (x,y) => x+','+y;
+const byId = id => state.blocks.find(b=>b.id===id);
+const at = (x,y) => state.blocks.find(b=>b.x===x&&b.y===y);
+const inGrid = (x,y) => x>=0&&y>=0&&x<GW&&y<GH;
+
+function mk(type,x,y,rot=0,props){
+  const T=TYPES[type];
+  return {id:state.nextId++, type, x, y, rot, flip:false, props:Object.assign({}, T.p||{}, props||{})};
+}
+function commit(){ undoS.push(JSON.stringify(state)); if(undoS.length>120) undoS.shift(); redoS=[]; }
+function changed(){ topoDirty=true; save(); renderInspector(); updateButtons(); }
+function save(){ try{ localStorage.setItem('criETiva-bancada-v1', JSON.stringify(state)); }catch(e){} }
+
+/* face base -> face no tabuleiro */
+function xf(bf,b){ let f=bf; if(b.flip&&(f===1||f===3)) f=4-f; return (f+b.rot)%4; }
+function faceTerm(b,f){
+  const T=TYPES[b.type];
+  for(let i=0;i<T.t.length;i++) for(const bf of T.t[i][1]) if(xf(bf,b)===f) return i;
+  return -1;
+}
+
+/* ============ Topologia ============ */
+function buildTopo(){
+  const occ=new Map(); state.blocks.forEach(b=>occ.set(key(b.x,b.y),b));
+  const par=new Map();
+  const find=k=>{ while(par.get(k)!==k){ par.set(k,par.get(par.get(k))); k=par.get(k);} return k; };
+  const uni=(a,b)=>{ a=find(a); b=find(b); if(a!==b) par.set(a,b); };
+  for(const b of state.blocks) TYPES[b.type].t.forEach((_,i)=>par.set(b.id+':'+i, b.id+':'+i));
+  const links=[], conn=new Set();
+  for(const b of state.blocks){
+    for(let f=0;f<4;f++){
+      const ti=faceTerm(b,f); if(ti<0) continue;
+      const nb=occ.get(key(b.x+DIR[f][0], b.y+DIR[f][1])); if(!nb) continue;
+      const tj=faceTerm(nb,(f+2)%4); if(tj<0) continue;
+      uni(b.id+':'+ti, nb.id+':'+tj);
+      conn.add(b.id+':'+f);
+      if(f===1||f===2) links.push({x:b.x,y:b.y,f});
+    }
+  }
+  const idx=new Map(); let n=0; const tn=new Map();
+  for(const b of state.blocks){
+    tn.set(b.id, TYPES[b.type].t.map((_,i)=>{ const r=find(b.id+':'+i); if(!idx.has(r)) idx.set(r,n++); return idx.get(r); }));
+  }
+  // componentes ligadas -> referência (0 V)
+  const cp=[...Array(n).keys()];
+  const cf=k=>{ while(cp[k]!==k){ cp[k]=cp[cp[k]]; k=cp[k];} return k; };
+  for(const b of state.blocks){ const nd=tn.get(b.id); for(let i=1;i<nd.length;i++){ const a=cf(nd[0]), c=cf(nd[i]); if(a!==c) cp[a]=c; } }
+  const ref=new Map(), hasSrc=new Set();
+  for(const b of state.blocks){ if(b.type==='battery'){ const r=cf(tn.get(b.id)[0]); hasSrc.add(r); if(!ref.has(r)) ref.set(r, tn.get(b.id)[0]); } }
+  for(const b of state.blocks){ if(b.type==='mcu'){ const r=cf(tn.get(b.id)[0]); hasSrc.add(r); if(!ref.has(r)) ref.set(r, tn.get(b.id)[0]); } }
+  for(let i=0;i<n;i++){ const r=cf(i); if(!ref.has(r)) ref.set(r,i); }
+  const ground=new Set(ref.values());
+  const live=new Uint8Array(n); for(let i=0;i<n;i++) live[i]=hasSrc.has(cf(i))?1:0;
+  topo={n, tn, links, conn, ground, live};
+  if(rt.V.length!==n) rt.V=new Float64Array(n);
+  topoDirty=false;
+}
+
+/* ============ Simulação (análise nodal + Newton-Raphson + Euler implícito) ============ */
+function sexp(x){ return x>80 ? Math.exp(80)*(1+x-80) : Math.exp(x); }
+function pnjlim(vnew,vold,vt,vcrit){
+  if(vnew>vcrit && Math.abs(vnew-vold)>2*vt){
+    if(vold>0){ const arg=1+(vnew-vold)/vt; vnew = arg>0 ? vold+vt*Math.log(arg) : vcrit; }
+    else vnew = vt*Math.log(vnew/vt);
+  }
+  return vnew;
+}
+function diodePar(b){
+  if(b.type==='led'){ const vf=LEDC[b.props.color]?LEDC[b.props.color].vf:2; const nvt=2*VT; return {Is:0.01/Math.exp(vf/nvt), nvt}; }
+  return {Is:2.5e-9, nvt:1.75*VT};
+}
+const BJT={Is:1e-14, bf:200, br:2};
+
+function step(h){
+  const n=topo.n; if(!n) return;
+  let V=rt.V;
+  const blocks=state.blocks, tn=topo.tn;
+  const hasNL=blocks.some(b=>(b.type==='led'&&!b.props.burned)||b.type==='diode'||b.type==='npn');
+  let A, B, it, conv=false;
+  const G=(a,b,g)=>{ A[a*n+a]+=g; A[b*n+b]+=g; A[a*n+b]-=g; A[b*n+a]-=g; };
+  const inj=(a,i)=>{ B[a]+=i; };
+  const lin=(row,c,co)=>{ for(const [k,g] of co) A[row*n+k]+=g; B[row]-=c; };
+  for(it=0; it<200; it++){
+    let lim=false;
+    A=new Float64Array(n*n); B=new Float64Array(n);
+    for(let i=0;i<n;i++) A[i*n+i]+=1e-9;
+    for(const b of blocks){
+      const nd=tn.get(b.id), p=b.props||{};
+      switch(b.type){
+        case 'resistor': G(nd[0],nd[1],1/p.r); break;
+        case 'pot': { const R=p.r, x=p.pos; G(nd[0],nd[2],1/Math.max(R*x,0.5)); G(nd[2],nd[1],1/Math.max(R*(1-x),0.5)); break; }
+        case 'ldr': G(nd[0],nd[1],1/ldrR(p.light)); break;
+        case 'switch': G(nd[0],nd[1], p.on?100:1e-9); break;
+        case 'button': G(nd[0],nd[1], rt.pressed.has(b.id)?100:1e-9); break;
+        case 'lamp': G(nd[0],nd[1],1/25); break;
+        case 'motor': G(nd[0],nd[1],1/12); break;
+        case 'buzzer': G(nd[0],nd[1],1/200); break;
+        case 'battery': { const g=1/0.3; G(nd[0],nd[1],g); inj(nd[1],p.v*g); inj(nd[0],-p.v*g); break; }
+        case 'mcu': { const on=Math.floor(rt.t*p.hz*2)%2===0, vs=on?3.3:0, g=1/20; G(nd[0],nd[1],g); inj(nd[1],vs*g); inj(nd[0],-vs*g); break; }
+        case 'capacitor': { const gc=p.c/h, vp=rt.vc.get(b.id)||0; G(nd[0],nd[1],gc); inj(nd[0],gc*vp); inj(nd[1],-gc*vp); break; }
+        case 'led': case 'diode': {
+          const a=nd[0], k=nd[1];
+          if(b.props.burned){ G(a,k,1e-9); break; }
+          const {Is,nvt}=diodePar(b), vcrit=nvt*Math.log(nvt/(Math.SQRT2*Is));
+          const raw=V[a]-V[k]; const vd=pnjlim(raw, rt.vd.has(b.id)?rt.vd.get(b.id):0, nvt, vcrit); rt.vd.set(b.id,vd); if(Math.abs(vd-raw)>1e-6) lim=true;
+          const e=sexp(vd/nvt), I0=Is*(e-1), gd=Is*e/nvt+1e-12, c=I0-gd*vd;
+          lin(a,c,[[a,gd],[k,-gd]]); lin(k,-c,[[a,-gd],[k,gd]]);
+          break;
+        }
+        case 'npn': {
+          const C=nd[0], Bn=nd[1], E=nd[2], {Is,bf,br}=BJT, vcrit=VT*Math.log(VT/(Math.SQRT2*Is));
+          const rbe=V[Bn]-V[E], rbc=V[Bn]-V[C];
+          const vbe=pnjlim(rbe, rt.vd.get(b.id+'be')||0, VT, vcrit), vbc=pnjlim(rbc, rt.vd.get(b.id+'bc')||0, VT, vcrit);
+          if(Math.abs(vbe-rbe)>1e-6||Math.abs(vbc-rbc)>1e-6) lim=true;
+          rt.vd.set(b.id+'be',vbe); rt.vd.set(b.id+'bc',vbc);
+          const ef=sexp(vbe/VT), er=sexp(vbc/VT), gf=Is*ef/VT+1e-12, gr=Is*er/VT+1e-12;
+          const Icc=Is*(ef-1), Iec=Is*(er-1);
+          const Ic=Icc-Iec*(1+1/br), Ib=Icc/bf+Iec/br;
+          const cbe=gf, cbc=-gr*(1+1/br), bbe=gf/bf, bbc=gr/br;
+          // I(row) ≈ I0 + gbe(vbe−vbe0) + gbc(vbc−vbc0);  vbe=VB−VE, vbc=VB−VC
+          const put=(row,I0,gbe,gbc)=>lin(row, I0-gbe*vbe-gbc*vbc, [[Bn,gbe+gbc],[E,-gbe],[C,-gbc]]);
+          put(C,Ic,cbe,cbc); put(Bn,Ib,bbe,bbc); put(E,-(Ic+Ib),-(cbe+bbe),-(cbc+bbc));
+          break;
+        }
+      }
+    }
+    for(const g of topo.ground){ for(let k=0;k<n;k++) A[g*n+k]=0; A[g*n+g]=1; B[g]=0; }
+    const X=solve(A,B,n);
+    let md=0; for(let i=0;i<n;i++){ const d=Math.abs(X[i]-V[i]); if(d>md) md=d; }
+    V=X;
+    if(!hasNL){ conv=true; break; }
+    if(md<1e-7 && it>0 && !lim){ conv=true; break; }
+  }
+  rt.V=V; rt.iters=it+1; rt.conv=conv;
+  outputs(h);
+}
+
+function solve(A,b,n){
+  for(let c=0;c<n;c++){
+    let p=c, m=Math.abs(A[c*n+c]);
+    for(let r=c+1;r<n;r++){ const v=Math.abs(A[r*n+c]); if(v>m){ m=v; p=r; } }
+    if(m<1e-30){ A[c*n+c]=1e-30; continue; }
+    if(p!==c){ for(let k=0;k<n;k++){ const t=A[c*n+k]; A[c*n+k]=A[p*n+k]; A[p*n+k]=t; } const t=b[c]; b[c]=b[p]; b[p]=t; }
+    const d=A[c*n+c];
+    for(let r=c+1;r<n;r++){
+      const f=A[r*n+c]/d; if(f===0) continue;
+      for(let k=c;k<n;k++) A[r*n+k]-=f*A[c*n+k];
+      b[r]-=f*b[c];
+    }
+  }
+  const x=new Float64Array(n);
+  for(let r=n-1;r>=0;r--){ let s=b[r]; for(let k=r+1;k<n;k++) s-=A[r*n+k]*x[k]; x[r]=s/A[r*n+r]; }
+  return x;
+}
+
+function outputs(h){
+  const V=rt.V, tn=topo.tn, W=[];
+  for(const b of state.blocks){
+    const nd=tn.get(b.id), p=b.props||{}, o={};
+    const v=nd.length>1 ? V[nd[0]]-V[nd[1]] : V[nd[0]];
+    o.v=v;
+    switch(b.type){
+      case 'resistor': o.i=v/p.r; o.p=v*o.i; if(o.p>0.25) W.push('Resistência de '+si(p.r,'Ω')+' a dissipar '+si(o.p,'W')+' (máx. 0,25 W)'); break;
+      case 'pot': { const R=p.r,x=p.pos; o.vw=V[nd[2]]-V[nd[1]]; o.i=(V[nd[0]]-V[nd[2]])/Math.max(R*x,0.5); o.p=(V[nd[0]]-V[nd[2]])*o.i+(V[nd[2]]-V[nd[1]])**2/Math.max(R*(1-x),0.5); break; }
+      case 'ldr': o.r=ldrR(p.light); o.i=v/o.r; o.p=v*o.i; break;
+      case 'switch': o.i=v*(p.on?100:1e-9); break;
+      case 'button': o.i=v*(rt.pressed.has(b.id)?100:1e-9); break;
+      case 'lamp': o.i=v/25; o.p=v*o.i; o.br=Math.min(1,o.p/0.3); break;
+      case 'motor': { o.i=v/12; o.p=v*o.i; const sp=Math.max(-1.6,Math.min(1.6,v/3)); o.sp=sp; rt.ang.set(b.id,((rt.ang.get(b.id)||0)+sp*h*900)%360); break; }
+      case 'buzzer': o.i=v/200; o.on=v>1.5; break;
+      case 'battery': { const vt=V[nd[1]]-V[nd[0]], i=(p.v-vt)/0.3; o.v=vt; o.i=i; o.p=vt*i; if(Math.abs(i)>1.5){ o.short=true; W.push('Curto-circuito na bateria: '+si(Math.abs(i),'A')); } break; }
+      case 'mcu': { const on=Math.floor(rt.t*p.hz*2)%2===0; o.on=on; o.v=V[nd[1]]-V[nd[0]]; o.i=((on?3.3:0)-o.v)/20; if(Math.abs(o.i)>0.04) W.push('Saída do microcontrolador a fornecer '+si(Math.abs(o.i),'A')+' (máx. 40 mA)'); break; }
+      case 'capacitor': { const vp=rt.vc.get(b.id)||0; o.i=p.c*(v-vp)/h; rt.vc.set(b.id,v); if(v<-1) W.push('Condensador com a polaridade trocada'); break; }
+      case 'led': case 'diode': {
+        if(p.burned){ o.i=0; o.br=0; if(b.type==='led') W.push('LED queimado — seleciona-o e carrega em Reparar'); break; }
+        const {Is,nvt}=diodePar(b); o.i=Is*(sexp(v/nvt)-1); o.p=v*o.i;
+        if(b.type==='led'){
+          o.br=o.i>2e-5 ? Math.min(1,Math.sqrt(o.i/0.02)) : 0;
+          let bt=rt.burnT.get(b.id)||0;
+          if(o.i>0.035) bt+=h*(o.i/0.035); else bt=Math.max(0,bt-h);
+          rt.burnT.set(b.id,bt);
+          if(bt>0.35){ p.burned=true; rt.burnT.set(b.id,0); topoDirty=true; save(); renderInspector(); }
+          else if(o.i>0.03) W.push('LED com '+si(o.i,'A')+': acima de 30 mA vai queimar');
+        }
+        break;
+      }
+      case 'npn': {
+        const C=V[nd[0]], Bv=V[nd[1]], E=V[nd[2]], {Is,bf,br}=BJT;
+        const ef=sexp((Bv-E)/VT), er=sexp((Bv-C)/VT);
+        o.ic=Is*(ef-1)-Is*(er-1)*(1+1/br); o.ib=Is*(ef-1)/bf+Is*(er-1)/br;
+        o.vbe=Bv-E; o.vce=C-E; o.p=o.ic*o.vce+o.ib*o.vbe;
+        o.reg = o.vbe<0.5 ? 'corte' : (o.vce<0.25 ? 'saturação' : 'ativa');
+        break;
+      }
+      default: o.v=V[nd[0]];
+    }
+    rt.out.set(b.id,o);
+  }
+  rt.warns=[...new Set(W)];
+}
+
+/* ============ Desenho ============ */
+const vcolLo=[61,123,217], vcolMid=[138,143,140], vcolHi=[229,72,44];
+function vcolor(v,vmax){
+  const t=Math.max(0,Math.min(1,v/vmax));
+  const [a,b,u]= t<0.5 ? [vcolLo,vcolMid,t*2] : [vcolMid,vcolHi,(t-0.5)*2];
+  return `rgb(${a.map((c,i)=>Math.round(c+(b[i]-c)*u)).join(',')})`;
+}
+
+function sym(b,col,o){
+  const p=b.props||{}, ink='var(--ink)';
+  const L=(d,c,w=3)=>`<path d="${d}" stroke="${c}" stroke-width="${w}" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`;
+  const I=(d,w=2,f='none')=>`<path d="${d}" stroke="${ink}" stroke-width="${w}" fill="${f}" stroke-linecap="round" stroke-linejoin="round"/>`;
+  const dot=(x)=>`<circle cx="${x}" cy="0" r="2.8" fill="var(--tile-pas)" stroke="${ink}" stroke-width="1.6"/>`;
+  const two=(r)=>L(`M-27 0H${-r}`,col(0))+L(`M${r} 0H27`,col(1));
+  switch(b.type){
+    case 'wire': return L('M-27 0H27',col(0));
+    case 'corner': return L('M27 0H0V27',col(0));
+    case 'tee': return L('M-27 0H27M0 0V27',col(0))+`<circle r="3.6" fill="${col(0)}"/>`;
+    case 'cross': return L('M-27 0H27M0 -27V27',col(0))+`<circle r="3.6" fill="${col(0)}"/>`;
+    case 'bridge': return L('M0 -27V27',col(1))+L('M-27 0H-8A8 8 0 0 1 8 0H27','var(--tile-lig)',7)+L('M-27 0H-8A8 8 0 0 1 8 0H27',col(0));
+    case 'resistor': { const hot=o&&o.p>0.25; return two(15)+`<rect x="-15" y="-7" width="30" height="14" rx="1.5" fill="${hot?'var(--hot)':'none'}" stroke="${ink}" stroke-width="2"/>`; }
+    case 'pot': return two(15)+`<rect x="-15" y="-7" width="30" height="14" rx="1.5" fill="none" stroke="${ink}" stroke-width="2"/>`+L('M0 27V14',col(2))+`<path d="M0 8.5L-4.5 15H4.5Z" fill="${ink}"/>`;
+    case 'ldr': { const lt=p.light; return two(15)+`<circle cx="-10" cy="-20" r="6" fill="#ffd54a" fill-opacity="${(lt*0.85).toFixed(2)}"/>`+`<rect x="-15" y="-7" width="30" height="14" rx="1.5" fill="none" stroke="${ink}" stroke-width="2"/>`+I('M-8 -19L-2 -10M-2 -10L-2.6 -14.4M-2 -10L-6 -11.8',1.5)+I('M1 -22L7 -13M7 -13L6.4 -17.4M7 -13L3 -14.8',1.5); }
+    case 'capacitor': { const q=o?Math.min(1,Math.abs(o.v)/5):0; return two(5)+`<rect x="-5" y="-12" width="10" height="24" fill="var(--accent)" opacity="${(q*0.75).toFixed(2)}"/>`+I('M-5 -13V13',2.6)+I('M5 -13V13',2.6)+I('M-15 -13H-9M-12 -16V-10',1.6); }
+    case 'battery': return two(5)+I('M-5 -7V7',4.5)+I('M5 -14V14',2)+I('M11 -14H17M14 -17V-11',1.6)+I('M-17 -14H-11',1.6);
+    case 'switch': return two(12)+(p.on?I('M-12 0L12 -1',2.6):I('M-12 0L9 -13',2.6))+dot(-12)+dot(12);
+    case 'button': { const y=rt.pressed.has(b.id)?-3:-11; return two(12)+dot(-12)+dot(12)+I(`M-14 ${y}H14M0 ${y}V${y-7}M-5 ${y-7}H5`,2.2); }
+    case 'diode': return two(9)+I('M-9 -10L9 0L-9 10Z',2)+I('M9 -10V10',2.6);
+    case 'led': {
+      const lc=LEDC[p.color]||LEDC.red, br=o&&o.br||0;
+      if(p.burned) return two(9)+I('M-9 -10L9 0L-9 10Z',2,'var(--tile-edge)')+I('M9 -10V10',2.6)+I('M-5 -14L3 -4L-1 2L6 11',1.4);
+      return two(9)+`<path d="M-9 -10L9 0L-9 10Z" fill="${lc.c}" fill-opacity="${(0.22+0.78*br).toFixed(2)}" stroke="${ink}" stroke-width="2" stroke-linejoin="round"/>`+I('M9 -10V10',2.6)+I('M2 -13L8 -20M5 -20H8V-17',1.4)+I('M8 -10L14 -17M11 -17H14V-14',1.4);
+    }
+    case 'npn': return `<circle cx="-2" cy="0" r="15" fill="none" stroke="${ink}" stroke-width="1.6"/>`+L('M-27 0H-8',col(1))+I('M-8 -9V9',3)+L('M-8 -4L0 -11V-27',col(0),2.6)+L('M-8 4L0 11V27',col(2),2.6)+`<path d="M-1.2 10.2L-7.4 8.8L-3.6 4.4Z" fill="${ink}"/>`;
+    case 'lamp': { const br=o&&o.br||0; return two(11)+`<circle r="11" fill="#ffd54a" fill-opacity="${br.toFixed(2)}" stroke="${ink}" stroke-width="2"/>`+I('M-7.8 -7.8L7.8 7.8M-7.8 7.8L7.8 -7.8',1.8); }
+    case 'motor': { const a=rt.ang.get(b.id)||0; return two(12)+`<circle r="12" fill="none" stroke="${ink}" stroke-width="2"/><g transform="rotate(${a.toFixed(1)})">`+I('M0 0V-8M0 0L6.9 4M0 0L-6.9 4',2.4)+'</g>'; }
+    case 'buzzer': { const on=o&&o.on; return two(12)+`<circle r="12" fill="none" stroke="${ink}" stroke-width="2"/><circle r="4" fill="${ink}"/>`+(on?I('M-7 -16Q0 -21 7 -16',1.6)+I('M-11 -20Q0 -27 11 -20',1.6):'')+I('M-22 -10H-16M-19 -13V-7',1.4); }
+    case 'mcu': { const on=o&&o.on; return two(13)+`<rect x="-13" y="-13" width="26" height="26" rx="2.5" fill="var(--chip)" stroke="${ink}" stroke-width="1.5"/>`+I('M-7 -13V-18M0 -13V-18M7 -13V-18M-7 13V18M0 13V18M7 13V18',1.5)+`<circle r="4.2" fill="${on?'#ff5a3c':'none'}" stroke="var(--chip-ink)" stroke-width="1.4"/>`; }
+  }
+  return '';
+}
+function label(b){
+  const p=b.props||{};
+  switch(b.type){
+    case 'resistor': case 'pot': return si(p.r,'Ω');
+    case 'capacitor': return si(p.c,'F');
+    case 'ldr': return luxTxt(p.light);
+    case 'battery': return num(p.v, p.v%1?1:0)+' V';
+    case 'mcu': return num(p.hz, p.hz%1?1:0)+' Hz';
+    case 'npn': return 'NPN';
+  }
+  return '';
+}
+function blockInner(b, ctx){
+  const T=TYPES[b.type], fam=FAM[T.cat];
+  let s=`<rect x="-27" y="-27" width="54" height="54" rx="7" class="tile t-${fam}"${ctx.o&&ctx.o.short?' style="stroke:var(--warn);stroke-width:3"':''}/>`;
+  s+=`<g transform="rotate(${b.rot*90}) scale(${b.flip?-1:1} 1)">`+sym(b,ctx.col,ctx.o);
+  T.t.forEach((t,ti)=>t[1].forEach(bf=>{
+    const [px,py]=FACE_PT[bf], c=ctx.conn?ctx.conn(xf(bf,b)):false;
+    const ix=px*0.93, iy=py*0.93, dx=(bf%2===0)?5:0, dy=(bf%2===0)?0:5;
+    const st=c?`fill="var(--gold)"`:`fill="none" stroke="var(--gold)" stroke-width="1"`;
+    s+=`<circle cx="${ix-dx}" cy="${iy-dy}" r="1.9" ${st}/><circle cx="${ix+dx}" cy="${iy+dy}" r="1.9" ${st}/>`;
+  }));
+  s+='</g>';
+  const lb=label(b); if(lb) s+=`<text class="lbl" x="-24" y="-17">${lb}</text>`;
+  return s;
+}
+
+function renderStatic(){
+  const w=GW*S, h=GH*S;
+  let s=`<rect x="0" y="0" width="${w}" height="${h}" fill="var(--mat)" rx="4"/>`;
+  for(let x=0;x<=w;x+=20){ const major=x%S===0; s+=`<line x1="${x}" y1="0" x2="${x}" y2="${h}" stroke="${major?'var(--mat-major)':'var(--mat-line)'}" stroke-width="${major?1.2:0.6}"/>`; }
+  for(let y=0;y<=h;y+=20){ const major=y%S===0; s+=`<line x1="0" y1="${y}" x2="${w}" y2="${y}" stroke="${major?'var(--mat-major)':'var(--mat-line)'}" stroke-width="${major?1.2:0.6}"/>`; }
+  for(let x=0;x<=w;x+=20){ const mm=x/2, major=x%S===0; s+=`<line x1="${x}" y1="-6" x2="${x}" y2="${major?-14:-9}" stroke="var(--muted)" stroke-width="0.8"/>`; if(major&&x<w) s+=`<text class="ruler" x="${x+2}" y="-15">${mm}</text>`; }
+  for(let y=0;y<=h;y+=20){ const major=y%S===0; s+=`<line x1="-6" y1="${y}" x2="${major?-14:-9}" y2="${y}" stroke="var(--muted)" stroke-width="0.8"/>`; if(major&&y>0&&y<h) s+=`<text class="ruler" x="-24" y="${y+10}">${y/2}</text>`; }
+  s+=`<text class="ruler" x="-24" y="-15">mm</text>`;
+  $('static').innerHTML=s;
+  $('defs').innerHTML=Object.entries(LEDC).map(([k,v])=>`<radialGradient id="g-${k}"><stop offset="0" stop-color="${v.c}" stop-opacity=".9"/><stop offset=".45" stop-color="${v.c}" stop-opacity=".35"/><stop offset="1" stop-color="${v.c}" stop-opacity="0"/></radialGradient>`).join('')+`<radialGradient id="g-lamp"><stop offset="0" stop-color="#ffd54a" stop-opacity=".9"/><stop offset="1" stop-color="#ffd54a" stop-opacity="0"/></radialGradient>`;
+  const svg=$('board');
+  svg.setAttribute('viewBox',`${-RUL} ${-RUL} ${w+RUL+4} ${h+RUL+4}`);
+  applyZoom();
+}
+
+function render(){
+  if(!topo) return;
+  const V=rt.V; let vmax=0.5;
+  for(let i=0;i<V.length;i++) if(topo.live[i]&&V[i]>vmax) vmax=V[i];
+  let s='', glow='';
+  const dragId = drag&&drag.kind==='move'&&drag.moved ? drag.b.id : null;
+  for(const b of state.blocks){
+    const nd=topo.tn.get(b.id), o=rt.out.get(b.id);
+    const col = ti => (showV && nd && topo.live[nd[ti]]) ? vcolor(V[nd[ti]],vmax) : 'var(--trace)';
+    const conn = f => topo.conn.has(b.id+':'+f);
+    s+=`<g transform="translate(${b.x*S+S/2} ${b.y*S+S/2})"${b.id===dragId?' opacity=".35"':''}>`+blockInner(b,{col,o,conn})+'</g>';
+    if(o&&o.br>0.02){
+      const g = b.type==='lamp' ? 'g-lamp' : 'g-'+(b.props.color||'red');
+      glow+=`<circle cx="${b.x*S+S/2}" cy="${b.y*S+S/2}" r="${(34+22*o.br).toFixed(1)}" fill="url(#${g})" opacity="${Math.min(1,0.25+o.br).toFixed(2)}" pointer-events="none"/>`;
+    }
+  }
+  let lk='';
+  for(const l of topo.links){
+    if(l.f===1){ const x=(l.x+1)*S, y=l.y*S+S/2; lk+=`<rect x="${x-1.6}" y="${y-9}" width="3.2" height="18" rx="1.2" fill="var(--gold)"/>`; }
+    else { const x=l.x*S+S/2, y=(l.y+1)*S; lk+=`<rect x="${x-9}" y="${y-1.6}" width="18" height="3.2" rx="1.2" fill="var(--gold)"/>`; }
+  }
+  let ov='';
+  const sb=sel&&byId(sel);
+  if(sb) ov+=`<rect x="${sb.x*S+1}" y="${sb.y*S+1}" width="${S-2}" height="${S-2}" rx="9" fill="none" stroke="var(--accent)" stroke-width="2.5"/>`;
+  // fantasma
+  if(drag&&drag.moved&&drag.cell){
+    const {x,y}=drag.cell, ok=inGrid(x,y)&&(!at(x,y)||(drag.b&&at(x,y)===drag.b));
+    if(inGrid(x,y)) ov+=`<rect x="${x*S+2}" y="${y*S+2}" width="${S-4}" height="${S-4}" rx="8" fill="none" stroke="${ok?'var(--ok)':'var(--warn)'}" stroke-width="2" stroke-dasharray="5 4"/>`;
+    const gb = drag.kind==='move' ? drag.b : {type:drag.type, rot:0, flip:false, props:Object.assign({},TYPES[drag.type].p||{})};
+    ov+=`<g transform="translate(${drag.px} ${drag.py})" opacity=".8" pointer-events="none">`+blockInner(gb,{col:()=>'var(--trace)',o:null,conn:null})+'</g>';
+  }
+  if(tool&&ptr&&!drag){
+    const {x,y}=ptr;
+    if(inGrid(x,y)&&!at(x,y)){
+      const gb={type:tool,rot:0,flip:false,props:Object.assign({},TYPES[tool].p||{})};
+      ov+=`<g transform="translate(${x*S+S/2} ${y*S+S/2})" opacity=".45" pointer-events="none">`+blockInner(gb,{col:()=>'var(--trace)',o:null,conn:null})+'</g>';
+    }
+  }
+  // leitura rápida
+  const hb = hover&&!drag ? at(hover.x,hover.y) : null;
+  if(hb){
+    const t=quick(hb);
+    if(t){
+      const w=t.length*6.7+14, cx=Math.min(Math.max(hb.x*S+S/2, w/2), GW*S-w/2), y=hb.y*S-6;
+      const yy = y<24 ? (hb.y+1)*S+28 : y;
+      ov+=`<g pointer-events="none"><rect class="tip-box" x="${cx-w/2}" y="${yy-20}" width="${w}" height="22" rx="6"/><text class="tip-txt" x="${cx}" y="${yy-5}" text-anchor="middle">${t}</text></g>`;
+    }
+  }
+  $('dyn').innerHTML=s+lk+glow+ov;
+}
+function quick(b){
+  const o=rt.out.get(b.id); if(!o) return '';
+  const nd=topo.tn.get(b.id); if(!nd||!topo.live[nd[0]]) return '';
+  switch(b.type){
+    case 'wire': case 'corner': case 'tee': case 'cross': return si(o.v,'V');
+    case 'bridge': return '';
+    case 'npn': return 'Ic '+si(o.ic,'A')+' · Vce '+si(o.vce,'V');
+    case 'battery': return si(o.v,'V')+' · '+si(o.i,'A');
+    default: return (o.i!==undefined? si(o.i,'A')+' · ':'')+si(o.v,'V');
+  }
+}
+
+/* ============ Paleta ============ */
+function renderPalette(){
+  let h='';
+  for(const [c,name,fam] of CATS){
+    h+=`<div class="pal-sec"><div class="pal-cat"><i class="tk" style="background:var(--tile-${fam})"></i>${name}</div><div class="pal-grid">`;
+    for(const [k,T] of Object.entries(TYPES)) if(T.cat===c){
+      const b={type:k,rot:0,flip:false,props:Object.assign({},T.p||{})};
+      h+=`<button class="pal-item" data-type="${k}" aria-pressed="false" title="${T.n}"><svg viewBox="-30 -30 60 60">${blockInner(b,{col:()=>'var(--trace)',o:null,conn:null})}</svg><span>${T.n}</span></button>`;
+    }
+    h+='</div></div>';
+  }
+  h+=`<p class="pal-hint">Arrasta um bloco para o tapete, ou clica nele e depois clica nas quadrículas. As faces com pontos dourados ligam-se quando encostam a outro bloco.</p>`;
+  $('palette').innerHTML=h;
+  $('palette').querySelectorAll('.pal-item').forEach(el=>{
+    el.addEventListener('pointerdown',e=>{
+      if(mode!=='edit') setMode('edit');
+      drag={kind:'new', type:el.dataset.type, sx:e.clientX, sy:e.clientY, moved:false, el};
+    });
+    el.addEventListener('keydown',e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); setTool(tool===el.dataset.type?null:el.dataset.type); } });
+  });
+}
+function setTool(t){
+  tool=t;
+  $('palette').querySelectorAll('.pal-item').forEach(el=>el.setAttribute('aria-pressed', String(el.dataset.type===t)));
+  renderInspector();
+}
+
+/* ============ Ponteiro ============ */
+function svgPt(cx,cy){ const m=$('board').getScreenCTM(); if(!m) return {x:-1e4,y:-1e4}; const p=new DOMPoint(cx,cy).matrixTransform(m.inverse()); return {x:p.x,y:p.y}; }
+const board=$('board');
+board.addEventListener('pointerdown',e=>{
+  const p=svgPt(e.clientX,e.clientY), x=Math.floor(p.x/S), y=Math.floor(p.y/S), b=inGrid(x,y)?at(x,y):null;
+  if(mode==='test'){
+    if(b){ sel=b.id; renderInspector(); interact(b,e,p); }
+    return;
+  }
+  if(tool){
+    if(inGrid(x,y)&&!b){ commit(); const nb=mk(tool,x,y); state.blocks.push(nb); sel=nb.id; changed(); }
+    else if(b){ sel=b.id; renderInspector(); }
+    return;
+  }
+  if(b){
+    sel=b.id; renderInspector();
+    drag={kind:'move', b, sx:e.clientX, sy:e.clientY, moved:false, px:p.x, py:p.y, cell:{x,y}};
+    board.setPointerCapture(e.pointerId);
+  } else { sel=null; renderInspector(); }
+});
+board.addEventListener('pointermove',e=>{
+  const p=svgPt(e.clientX,e.clientY), x=Math.floor(p.x/S), y=Math.floor(p.y/S);
+  hover = inGrid(x,y)?{x,y}:null; ptr=hover;
+  const hb=hover&&at(x,y);
+  board.style.cursor = mode==='test' ? (hb&&['switch','button','pot','ldr'].includes(hb.type)?'pointer':'default') : (tool?'copy':(hb?'grab':'default'));
+});
+board.addEventListener('pointerleave',()=>{ hover=null; ptr=null; });
+board.addEventListener('dblclick',e=>{
+  if(mode!=='edit') return;
+  const p=svgPt(e.clientX,e.clientY), b=at(Math.floor(p.x/S),Math.floor(p.y/S));
+  if(b){ sel=b.id; rotate(); }
+});
+window.addEventListener('pointermove',e=>{
+  if(!drag) return;
+  if(drag.kind==='pot'){ const b=byId(drag.id); if(b){ const p=svgPt(e.clientX,e.clientY); b.props[drag.k]=Math.max(0,Math.min(1,drag.p0+(p.x-drag.x0)/(S*2.5))); syncPotInput(b,drag.k); } return; }
+  if(!drag.moved && Math.hypot(e.clientX-drag.sx,e.clientY-drag.sy)>6) drag.moved=true;
+  if(drag.moved){ const p=svgPt(e.clientX,e.clientY); drag.px=p.x; drag.py=p.y; drag.cell={x:Math.floor(p.x/S), y:Math.floor(p.y/S)}; }
+});
+function endDrag(e,cancel){
+  rt.pressed.clear();
+  if(!drag) return;
+  const d=drag; drag=null;
+  if(d.kind==='pot'){ save(); return; }
+  if(d.kind==='new'){
+    if(!d.moved && !cancel){ setTool(tool===d.type?null:d.type); return; }
+    if(cancel||!d.cell) return;
+    const {x,y}=d.cell;
+    if(inGrid(x,y)&&!at(x,y)){ commit(); const nb=mk(d.type,x,y); state.blocks.push(nb); sel=nb.id; changed(); }
+    return;
+  }
+  if(d.kind==='move'&&d.moved&&!cancel){
+    const {x,y}=d.cell;
+    if(inGrid(x,y)&&!at(x,y)){ commit(); d.b.x=x; d.b.y=y; changed(); }
+  }
+}
+window.addEventListener('pointerup',e=>endDrag(e,false));
+window.addEventListener('pointercancel',e=>endDrag(e,true));
+
+function interact(b,e,p){
+  if(b.type==='switch'){ b.props.on=!b.props.on; save(); renderInspector(); }
+  else if(b.type==='button'){ rt.pressed.add(b.id); drag={kind:'press'}; }
+  else if(b.type==='pot'||b.type==='ldr'){ const k=b.type==='pot'?'pos':'light'; drag={kind:'pot', id:b.id, k, x0:p.x, p0:b.props[k]}; board.setPointerCapture(e.pointerId); }
+}
+
+/* ============ Edição ============ */
+function rotate(){ const b=sel&&byId(sel); if(!b) return; commit(); b.rot=(b.rot+1)%4; changed(); }
+function flip(){ const b=sel&&byId(sel); if(!b) return; commit(); b.flip=!b.flip; changed(); }
+function del(){ const b=sel&&byId(sel); if(!b) return; commit(); state.blocks=state.blocks.filter(x=>x!==b); sel=null; changed(); }
+function nudge(dx,dy){ const b=sel&&byId(sel); if(!b) return; const x=b.x+dx,y=b.y+dy; if(inGrid(x,y)&&!at(x,y)){ commit(); b.x=x; b.y=y; changed(); } }
+function undo(){ if(!undoS.length) return; redoS.push(JSON.stringify(state)); state=JSON.parse(undoS.pop()); sel=null; changed(); }
+function redo(){ if(!redoS.length) return; undoS.push(JSON.stringify(state)); state=JSON.parse(redoS.pop()); sel=null; changed(); }
+function setMode(m){
+  mode=m; $('m-edit').setAttribute('aria-pressed',String(m==='edit')); $('m-test').setAttribute('aria-pressed',String(m==='test'));
+  if(m==='test') setTool(null); else renderInspector();
+}
+function resetSim(){ rt.t=0; rt.vc.clear(); rt.vd.clear(); rt.burnT.clear(); rt.V=new Float64Array(topo?topo.n:0); }
+
+document.addEventListener('keydown',e=>{
+  const tg=e.target.tagName; if(tg==='INPUT'||tg==='SELECT'||tg==='TEXTAREA') return;
+  const k=e.key.toLowerCase(), mod=e.ctrlKey||e.metaKey;
+  if(mod&&k==='z'){ e.preventDefault(); e.shiftKey?redo():undo(); return; }
+  if(mod&&k==='y'){ e.preventDefault(); redo(); return; }
+  if(mod) return;
+  if(k==='t'){ setMode(mode==='edit'?'test':'edit'); return; }
+  if(k==='escape'){ setTool(null); sel=null; renderInspector(); return; }
+  if(mode!=='edit') return;
+  if(k==='r'){ rotate(); }
+  else if(k==='f'){ flip(); }
+  else if(k==='delete'||k==='backspace'){ e.preventDefault(); del(); }
+  else if(k==='arrowleft'){ e.preventDefault(); nudge(-1,0); }
+  else if(k==='arrowright'){ e.preventDefault(); nudge(1,0); }
+  else if(k==='arrowup'){ e.preventDefault(); nudge(0,-1); }
+  else if(k==='arrowdown'){ e.preventDefault(); nudge(0,1); }
+});
+
+/* ============ Ficha do bloco ============ */
+function renderInspector(){
+  const el=$('inspector'), b=sel&&byId(sel);
+  if(!b){
+    const n=state.blocks.length;
+    el.innerHTML=`<div class="insp-cat">${mode==='edit'?'Modo montar':'Modo testar'}</div><h2>${tool?'A colocar: '+TYPES[tool].n:(n?n+' blocos no tapete':'Tapete vazio')}</h2>
+      <ul class="tips">${mode==='edit'
+        ? `<li>Arrasta blocos da paleta para o tapete. Cada quadrícula corresponde a um bloco de 30 × 30 mm.</li><li>Dois blocos ligam-se quando encostam faces com pontos dourados. A barra dourada entre eles marca a ligação.</li><li>As cores das ligações mostram a tensão: azul perto de 0 V, vermelho na tensão máxima.</li><li>Passa o rato sobre um bloco para ver a corrente e a tensão.</li>`
+        : `<li>Clica num interruptor para o abrir ou fechar.</li><li>Mantém o clique num botão para o pressionar.</li><li>Arrasta na horizontal sobre um potenciómetro para mexer no cursor, ou sobre um LDR para mudar a luz.</li><li>Clica num bloco para ver as medições na ficha.</li>`}</ul>
+      <ul class="keys"><li><kbd>R</kbd> rodar &nbsp; <kbd>F</kbd> espelhar</li><li><kbd>Del</kbd> apagar &nbsp; <kbd>←↑→↓</kbd> mover</li><li><kbd>T</kbd> montar / testar &nbsp; <kbd>Esc</kbd> largar</li><li><kbd>Ctrl</kbd>+<kbd>Z</kbd> desfazer &nbsp; duplo clique roda</li></ul>`;
+    return;
+  }
+  const T=TYPES[b.type];
+  let h=`<div class="insp-cat">${CATNAME[T.cat]}</div><h2>${T.n}</h2><p class="insp-desc">${T.d}</p>`;
+  for(const d of PROPS[b.type]||[]){
+    if(d.range){
+      h+=`<div class="field"><label for="p-${d.k}">${d.l}: <span id="pv-${d.k}">${d.f(b.props[d.k])}</span></label><input type="range" id="p-${d.k}" min="0" max="100" value="${Math.round(b.props[d.k]*100)}"></div>`;
+    } else {
+      h+=`<div class="field"><label for="p-${d.k}">${d.l}</label><select id="p-${d.k}">${d.o.map(([v,l])=>`<option value="${v}"${String(v)===String(b.props[d.k])?' selected':''}>${l}</option>`).join('')}</select></div>`;
+    }
+  }
+  h+=`<dl class="readings" id="readings"></dl><div class="actions">`;
+  if(b.type==='switch') h+=`<button class="btn" id="a-toggle">${b.props.on?'Abrir interruptor':'Fechar interruptor'}</button>`;
+  if(b.type==='led'&&b.props.burned) h+=`<button class="btn" id="a-fix">Reparar LED</button>`;
+  if(mode==='edit') h+=`<button class="btn" id="a-rot">Rodar</button><button class="btn" id="a-flip">Espelhar</button><button class="btn danger" id="a-del">Apagar</button>`;
+  h+='</div>';
+  h+=`<p class="pal-hint" style="margin-top:12px">Terminais: ${T.t.map(t=>t[0]).filter(Boolean).join(' · ')||'um único nó'}</p>`;
+  el.innerHTML=h;
+  for(const d of PROPS[b.type]||[]){
+    const inp=$('p-'+d.k);
+    if(d.range){ inp.addEventListener('input',()=>{ b.props[d.k]=inp.value/100; $('pv-'+d.k).textContent=d.f(b.props[d.k]); save(); }); }
+    else inp.addEventListener('change',()=>{ const o=d.o.find(o=>String(o[0])===inp.value); commit(); b.props[d.k]=o[0]; if(b.type==='led') b.props.burned=false; changed(); });
+  }
+  const on=(id,f)=>{ const x=$(id); if(x) x.addEventListener('click',f); };
+  on('a-toggle',()=>{ b.props.on=!b.props.on; save(); renderInspector(); });
+  on('a-fix',()=>{ commit(); b.props.burned=false; changed(); });
+  on('a-rot',rotate); on('a-flip',flip); on('a-del',del);
+  renderReadings();
+}
+function syncPotInput(b,k){ if(sel!==b.id) return; const i=$('p-'+k), d=(PROPS[b.type]||[]).find(d=>d.k===k); if(i&&d){ i.value=Math.round(b.props[k]*100); $('pv-'+k).textContent=d.f(b.props[k]); } }
+function renderReadings(){
+  const el=$('readings'); if(!el) return;
+  const b=sel&&byId(sel); if(!b||!topo) return;
+  const o=rt.out.get(b.id), nd=topo.tn.get(b.id);
+  if(!o||!nd){ el.innerHTML='<dt>A calcular…</dt><dd></dd>'; return; }
+  if(!topo.live[nd[0]]){ el.innerHTML='<dt>Sem fonte de energia ligada</dt><dd>—</dd>'; return; }
+  const R=[];
+  switch(b.type){
+    case 'wire': case 'corner': case 'tee': case 'cross': R.push(['Tensão no nó',si(o.v,'V')]); break;
+    case 'bridge': R.push(['Tensão (horizontal)',si(rt.V[nd[0]],'V')],['Tensão (vertical)',si(rt.V[nd[1]],'V')]); break;
+    case 'battery': R.push(['Tensão aos terminais',si(o.v,'V')],['Corrente fornecida',si(o.i,'A')],['Potência',si(o.p,'W')]); break;
+    case 'mcu': R.push(['Saída OUT',o.on?'ligada':'desligada'],['Tensão OUT',si(o.v,'V')],['Corrente',si(o.i,'A')]); break;
+    case 'npn': R.push(['Corrente de coletor',si(o.ic,'A')],['Corrente de base',si(o.ib,'A')],['V base-emissor',si(o.vbe,'V')],['V coletor-emissor',si(o.vce,'V')],['Região',o.reg]); if(o.ib>1e-7&&o.reg==='ativa') R.push(['Ganho Ic/Ib',Math.round(o.ic/o.ib)]); break;
+    case 'pot': R.push(['Tensão A–B',si(o.v,'V')],['Tensão cursor–B',si(o.vw,'V')],['Corrente em A',si(o.i,'A')]); break;
+    case 'capacitor': R.push(['Tensão',si(o.v,'V')],['Corrente',si(o.i,'A')],['Carga',si(b.props.c*Math.abs(o.v),'C')]); break;
+    default:
+      R.push(['Tensão',si(o.v,'V')]);
+      if(o.i!==undefined) R.push(['Corrente',si(o.i,'A')]);
+      if(o.p!==undefined) R.push(['Potência',si(o.p,'W')]);
+      if(b.type==='ldr') R.push(['Resistência',si(o.r,'Ω')],['Luz',luxTxt(b.props.light)]);
+      if(b.type==='led') R.push(['Brilho',Math.round((o.br||0)*100)+' %']);
+      if(b.type==='switch') R.push(['Estado',b.props.on?'fechado':'aberto']);
+      if(b.type==='button') R.push(['Estado',rt.pressed.has(b.id)?'pressionado':'solto']);
+  }
+  el.innerHTML=R.map(([a,v])=>`<dt>${a}</dt><dd>${v}</dd>`).join('');
+}
+
+function renderStatus(){
+  const n=state.blocks.length;
+  let h=`<span class="mono">t = ${num(rt.t,1)} s</span><span>${n} blocos · ${topo?topo.n:0} nós</span>`;
+  if(paused) h+=`<span class="chip warn">Simulação em pausa</span>`;
+  if(!rt.conv) h+=`<span class="chip warn">O cálculo não convergiu neste instante</span>`;
+  if(rt.warns.length) h+=rt.warns.map(w=>`<span class="chip warn">${w}</span>`).join('');
+  else if(n) h+=`<span class="chip ok">Sem avisos</span>`;
+  $('status').innerHTML=h;
+}
+function updateButtons(){ $('b-undo').disabled=!undoS.length; $('b-redo').disabled=!redoS.length; }
+
+/* ============ Som ============ */
+let actx=null, osc=null, gain=null;
+function soundTick(){
+  const want = sound && state.blocks.some(b=>b.type==='buzzer'&&rt.out.get(b.id)&&rt.out.get(b.id).on);
+  if(!actx) return;
+  gain.gain.setTargetAtTime(want?0.05:0, actx.currentTime, 0.01);
+}
+function initAudio(){
+  try{
+    actx=new (window.AudioContext||window.webkitAudioContext)();
+    osc=actx.createOscillator(); gain=actx.createGain(); osc.type='square'; osc.frequency.value=2400; gain.gain.value=0;
+    osc.connect(gain).connect(actx.destination); osc.start();
+  }catch(e){ actx=null; }
+}
+
+/* ============ Exemplos ============ */
+const B=(t,x,y,r,p)=>[t,x,y,r||0,p];
+const EX={
+  led:{n:'LED com resistência',b:[B('battery',4,4,0,{v:3.7}),B('resistor',5,4,0,{r:220}),B('led',6,4,0,{color:'red'}),B('corner',7,4,1),B('wire',7,5,1),B('corner',7,6,2),B('wire',6,6,0),B('switch',5,6,0,{on:true}),B('wire',4,6,0),B('corner',3,6,3),B('wire',3,5,1),B('corner',3,4,0)]},
+  burn:{n:'LED sem resistência',b:[B('battery',4,4,0,{v:3.7}),B('wire',5,4,0),B('led',6,4,0,{color:'blue'}),B('corner',7,4,1),B('wire',7,5,1),B('corner',7,6,2),B('wire',6,6,0),B('switch',5,6,0,{on:false}),B('wire',4,6,0),B('corner',3,6,3),B('wire',3,5,1),B('corner',3,4,0)]},
+  pot:{n:'Potenciómetro controla o brilho',b:[B('battery',3,3,0),B('pot',4,3,0,{r:10000,pos:0.05}),B('corner',5,3,1),B('wire',5,4,1),B('wire',5,5,1),B('corner',5,6,2),B('resistor',4,4,1,{r:100}),B('led',4,5,1,{color:'green'}),B('tee',4,6,2),B('wire',3,6,0),B('corner',2,6,3),B('wire',2,5,1),B('wire',2,4,1),B('corner',2,3,0)]},
+  npn:{n:'Transístor como interruptor',b:[B('battery',1,4,3),B('wire',1,3,1),B('wire',1,2,1),B('corner',1,1,0),B('wire',2,1,0),B('tee',3,1,0),B('wire',4,1,0),B('wire',5,1,0),B('corner',6,1,1),B('resistor',6,2,1,{r:220}),B('led',6,3,1,{color:'yellow'}),B('npn',6,4,0),B('wire',6,5,1),B('wire',6,6,1),B('corner',6,7,2),B('button',3,2,1),B('wire',3,3,1),B('corner',3,4,3),B('wire',4,4,0),B('resistor',5,4,0,{r:10000}),B('wire',1,5,1),B('wire',1,6,1),B('corner',1,7,3),B('wire',2,7,0),B('wire',3,7,0),B('wire',4,7,0),B('wire',5,7,0)]},
+  cap:{n:'Condensador mantém o LED aceso',b:[B('battery',1,4,3),B('wire',1,3,1),B('wire',1,2,1),B('corner',1,1,0),B('button',2,1,0),B('resistor',3,1,0,{r:100}),B('tee',4,1,0),B('wire',5,1,0),B('corner',6,1,1),B('capacitor',4,2,1,{c:2200e-6}),B('wire',4,3,1),B('wire',4,4,1),B('wire',4,5,1),B('wire',4,6,1),B('tee',4,7,2),B('resistor',6,2,1,{r:220}),B('led',6,3,1,{color:'green'}),B('wire',6,4,1),B('wire',6,5,1),B('wire',6,6,1),B('corner',6,7,2),B('wire',1,5,1),B('wire',1,6,1),B('corner',1,7,3),B('wire',2,7,0),B('wire',3,7,0),B('wire',5,7,0)]},
+  mcu:{n:'Microcontrolador a piscar um LED',b:[B('mcu',2,3,0,{hz:1}),B('resistor',3,3,0,{r:220}),B('led',4,3,0,{color:'red'}),B('corner',5,3,1),B('wire',5,4,1),B('corner',5,5,2),B('wire',4,5,0),B('wire',3,5,0),B('wire',2,5,0),B('corner',1,5,3),B('wire',1,4,1),B('corner',1,3,0)]},
+  ldr:{n:'LDR: luz de presença (acende no escuro)',b:[B('battery',1,4,3),B('wire',1,3,1),B('wire',1,2,1),B('corner',1,1,0),B('wire',2,1,0),B('tee',3,1,0),B('wire',4,1,0),B('wire',5,1,0),B('corner',6,1,1),B('resistor',6,2,1,{r:220}),B('led',6,3,1,{color:'yellow'}),B('npn',6,4,0),B('wire',6,5,1),B('wire',6,6,1),B('corner',6,7,2),B('resistor',3,2,1,{r:10000}),B('wire',3,3,1),B('tee',3,4,3),B('wire',4,4,0),B('resistor',5,4,0,{r:1000}),B('ldr',3,5,1,{light:0.9}),B('wire',3,6,1),B('tee',3,7,2),B('wire',1,5,1),B('wire',1,6,1),B('corner',1,7,3),B('wire',2,7,0),B('wire',4,7,0),B('wire',5,7,0)]},
+  motor:{n:'Motor e lâmpada em paralelo',b:[B('battery',1,4,3,{v:5}),B('wire',1,3,1),B('wire',1,2,1),B('corner',1,1,0),B('switch',2,1,0,{on:true}),B('tee',3,1,0),B('wire',4,1,0),B('corner',5,1,1),B('motor',3,2,1),B('wire',3,3,1),B('wire',3,4,1),B('wire',3,5,1),B('tee',3,6,2),B('lamp',5,2,1),B('wire',5,3,1),B('wire',5,4,1),B('wire',5,5,1),B('corner',5,6,2),B('wire',4,6,0),B('wire',1,5,1),B('corner',1,6,3),B('wire',2,6,0)]},
+};
+function loadExample(k){
+  const ex=EX[k]; if(!ex) return;
+  commit();
+  const xs=ex.b.map(e=>e[1]), ys=ex.b.map(e=>e[2]);
+  const dx=Math.floor((GW-(Math.max(...xs)-Math.min(...xs)+1))/2)-Math.min(...xs);
+  const dy=Math.floor((GH-(Math.max(...ys)-Math.min(...ys)+1))/2)-Math.min(...ys);
+  state={blocks:[],nextId:1};
+  for(const [t,x,y,r,p] of ex.b) state.blocks.push(mk(t,x+dx,y+dy,r,p));
+  sel=null; resetSim(); changed();
+}
+
+/* ============ Ficheiro ============ */
+function openModal(){ $('json').value=JSON.stringify({app:'Bancada criETiva',versao:1,blocos:state.blocks},null,1); $('j-msg').textContent=''; $('modal').hidden=false; }
+function loadJSON(txt){
+  try{
+    const d=JSON.parse(txt), arr=Array.isArray(d)?d:(d.blocos||d.blocks);
+    if(!Array.isArray(arr)) throw new Error('sem lista de blocos');
+    const ok=arr.filter(b=>TYPES[b.type]&&Number.isInteger(b.x)&&Number.isInteger(b.y)&&inGrid(b.x,b.y));
+    commit();
+    state={blocks:[],nextId:1};
+    const seen=new Set();
+    for(const b of ok){ const k=key(b.x,b.y); if(seen.has(k)) continue; seen.add(k); const nb=mk(b.type,b.x,b.y,(b.rot|0)%4,b.props); nb.flip=!!b.flip; state.blocks.push(nb); }
+    sel=null; resetSim(); changed();
+    $('j-msg').textContent=`Abertos ${state.blocks.length} blocos.`;
+  }catch(e){ $('j-msg').textContent='Não consegui ler este texto como circuito ('+e.message+'). Confirma que copiaste o JSON completo.'; }
+}
+
+/* ============ Zoom ============ */
+function applyZoom(){ const w=(GW*S+RUL+4)*zoom, h=(GH*S+RUL+4)*zoom; const s=$('board'); s.style.width=w+'px'; s.style.height=h+'px'; }
+function fit(){ const c=$('canvas'); const avW=c.clientWidth-28, avH=c.clientHeight-28; zoom=Math.max(0.45,Math.min(1.5, avW/(GW*S+RUL+4), avH>200? avH/(GH*S+RUL+4) : 9)); applyZoom(); }
+
+/* ============ Ligações da interface ============ */
+$('m-edit').onclick=()=>setMode('edit');
+$('m-test').onclick=()=>setMode('test');
+$('b-undo').onclick=undo; $('b-redo').onclick=redo;
+$('b-volt').onclick=()=>{ showV=!showV; $('b-volt').setAttribute('aria-pressed',String(showV)); };
+$('b-sound').onclick=()=>{ sound=!sound; $('b-sound').setAttribute('aria-pressed',String(sound)); if(sound&&!actx) initAudio(); if(actx&&actx.state==='suspended') actx.resume(); };
+$('b-pause').onclick=()=>{ paused=!paused; $('b-pause').setAttribute('aria-pressed',String(paused)); $('b-pause').textContent=paused?'Continuar':'Pausar'; };
+$('b-reset').onclick=()=>resetSim();
+$('z-in').onclick=()=>{ zoom=Math.min(2.2,zoom*1.2); applyZoom(); };
+$('z-out').onclick=()=>{ zoom=Math.max(0.35,zoom/1.2); applyZoom(); };
+$('z-fit').onclick=fit;
+let clearArm=null;
+$('b-clear').onclick=()=>{
+  const b=$('b-clear');
+  if(clearArm){ clearTimeout(clearArm); clearArm=null; b.textContent='Limpar'; commit(); state={blocks:[],nextId:1}; sel=null; resetSim(); changed(); return; }
+  b.textContent='Confirmar limpeza'; clearArm=setTimeout(()=>{ clearArm=null; b.textContent='Limpar'; },3000);
+};
+const exSel=$('ex');
+for(const [k,v] of Object.entries(EX)){ const o=document.createElement('option'); o.value=k; o.textContent=v.n; exSel.appendChild(o); }
+exSel.onchange=()=>{ if(exSel.value){ loadExample(exSel.value); exSel.value=''; } };
+$('b-file').onclick=openModal;
+$('j-close').onclick=()=>{ $('modal').hidden=true; };
+$('modal').addEventListener('click',e=>{ if(e.target.id==='modal') $('modal').hidden=true; });
+$('j-copy').onclick=()=>{
+  const t=$('json');
+  navigator.clipboard.writeText(t.value).then(()=>{ $('j-msg').textContent='Copiado.'; }).catch(()=>{ t.focus(); t.select(); $('j-msg').textContent='Texto selecionado: usa Ctrl+C para copiar.'; });
+};
+$('j-load').onclick=()=>loadJSON($('json').value);
+$('j-file').onchange=e=>{ const f=e.target.files[0]; if(!f) return; const r=new FileReader(); r.onload=()=>{ $('json').value=r.result; loadJSON(r.result); }; r.readAsText(f); e.target.value=''; };
+
+/* ============ Arranque ============ */
+renderPalette();
+renderStatic();
+let loaded=false;
+try{
+  const s=localStorage.getItem('criETiva-bancada-v1');
+  if(s){ const d=JSON.parse(s); if(d&&Array.isArray(d.blocks)&&d.blocks.length){ state=d; loaded=true; } }
+}catch(e){}
+if(!loaded){ loadExample('led'); undoS=[]; }
+changed();
+requestAnimationFrame(()=>fit());
+window.addEventListener('resize',()=>{});
+
+let last=performance.now(), slow=0;
+function frame(t){
+  const dt=Math.min(0.05,(t-last)/1000); last=t;
+  if(topoDirty) buildTopo();
+  if(!paused && topo && topo.n){ const sub=3; for(let i=0;i<sub;i++){ step(dt/sub); rt.t+=dt/sub; } }
+  render();
+  slow+=dt; if(slow>0.15){ slow=0; renderReadings(); renderStatus(); soundTick(); }
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+</script>
+</body></html>
