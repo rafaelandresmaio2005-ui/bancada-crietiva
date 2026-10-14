@@ -186,7 +186,7 @@ kbd{font-family:var(--f-mono);font-size:11px;border:1px solid var(--line);border
 const S = 60, GW = 18, GH = 11, RUL = 26;
 const FACE_PT = [[0,-27],[27,0],[0,27],[-27,0]];
 const DIR = [[0,-1],[1,0],[0,1],[-1,0]];
-const VT = 0.025852;
+const VT = 0.025852, STEP_MIN = 1/540/256*1.01;
 
 const LEDC = {
   red:{n:'Vermelho', c:'#ff3b2f', vf:1.9},
@@ -196,7 +196,7 @@ const LEDC = {
   white:{n:'Branco', c:'#eef3ff', vf:3.0},
 };
 
-const CATS = [['lig','Ligações','lig'],['ali','Alimentação','ali'],['pas','Passivos','pas'],['ctl','Controlo','pas'],['sem','Semicondutores','atv'],['out','Saídas','atv']];
+const CATS = [['lig','Ligações','lig'],['ali','Alimentação','ali'],['pas','Passivos','pas'],['ctl','Controlo','pas'],['sem','Semicondutores','atv'],['ci','Circuitos integrados','atv'],['out','Saídas','atv']];
 const FAM = Object.fromEntries(CATS.map(c=>[c[0],c[2]]));
 const CATNAME = Object.fromEntries(CATS.map(c=>[c[0],c[1]]));
 
@@ -208,6 +208,8 @@ const TYPES = {
   bridge:{n:'Cruzamento',cat:'lig',t:[['horizontal',[1,3]],['vertical',[0,2]]],d:'Dois fios independentes que se cruzam sem se tocarem.'},
   battery:{n:'Bateria',cat:'ali',t:[['−',[3]],['+',[1]]],p:{v:3.7},d:'Fonte de energia. A corrente sai pelo polo + e volta pelo polo −. Tem uma pequena resistência interna de 0,3 Ω, por isso um curto-circuito puxa vários amperes.'},
   mcu:{n:'Microcontrolador',cat:'ali',t:[['GND',[3]],['OUT',[1]]],p:{hz:1},d:'Corre um programa “blink”: liga e desliga a saída OUT (3,3 V) à frequência escolhida. A face GND é a referência de 0 V.'},
+  mcu2:{n:'Microcontrolador 2×2',cat:'ali',sz:2,t:[['GND',[[0,1,3]]],['5V',[[0,0,3]]],['D10',[[0,0,0]]],['D9',[[1,0,0]]],['D8',[[1,0,1]]],['D7',[[1,1,1]]],['A0',[[1,1,2]]],['D2',[[0,1,2]]]],p:{prog:'peao',v:5},d:'Microcontrolador do tamanho de 2 × 2 blocos, com 8 ligações (duas por lado): GND e 5V (saída de alimentação) à esquerda, D10 e D9 em cima, D8 e D7 à direita, D2 e A0 em baixo. As saídas digitais dão 0 ou 5 V através de ~25 Ω; D2 é entrada com pull-up interno (35 kΩ), por isso um botão entre D2 e GND lê LOW quando carregado; A0 é entrada analógica. Os programas imitam um Arduino Uno.'},
+  mcu3:{n:'Microcontrolador semáforo',cat:'ali',t:[['GND',[3]],['D10 · vermelho',[0]],['D9 · amarelo',[1]],['D8 · verde',[2]]],p:{prog:'peao',v:5},d:'Microcontrolador com três saídas (D10, D9 e D8, como no Arduino Uno) e o botão do peão (D2, com pull-up interno) no próprio bloco. Programa “peão”: verde aceso; ao carregar no botão passa a amarelo 2 s, vermelho 5 s e volta ao verde. Programa “automático”: verde 4 s, amarelo 1,5 s, vermelho 4 s. No modo Testar, carrega no bloco para usar o botão.'},
   resistor:{n:'Resistência',cat:'pas',t:[['A',[3]],['B',[1]]],p:{r:220},d:'Limita a corrente. Lei de Ohm: I = V / R. Se dissipar mais de 0,25 W aquece (fica vermelha).'},
   capacitor:{n:'Condensador',cat:'pas',t:[['+',[3]],['−',[1]]],p:{c:470e-6},d:'Guarda carga elétrica: carrega enquanto tem tensão aos terminais e devolve a energia depois. É eletrolítico, respeita o polo +. O preenchimento mostra a carga.'},
   switch:{n:'Interruptor',cat:'ctl',t:[['A',[3]],['B',[1]]],p:{on:true},d:'Abre ou fecha o circuito. No modo Testar, clica no bloco para mudar de estado.'},
@@ -217,17 +219,25 @@ const TYPES = {
   diode:{n:'Díodo',cat:'sem',t:[['ânodo',[3]],['cátodo',[1]]],d:'Só deixa passar corrente num sentido, do ânodo para o cátodo (o lado da barra). Consome cerca de 0,7 V.'},
   led:{n:'LED',cat:'sem',t:[['ânodo',[3]],['cátodo',[1]]],p:{color:'red'},d:'Díodo que emite luz. Precisa de uma resistência em série: acima de cerca de 30 mA queima.'},
   npn:{n:'Transístor NPN',cat:'sem',t:[['coletor',[0]],['base',[3]],['emissor',[2]]],d:'Transístor NPN (tipo BC547). Uma corrente pequena na base controla uma corrente até 200 vezes maior entre o coletor e o emissor.'},
+  ne555:{n:'Temporizador 555',cat:'ci',t:[['VCC',[0]],['OUT',[1]],['GND',[2]],['TRIG',[3]]],p:{mode:'ast',kind:'ne',r1:10000,r2:68000,c:10e-6},d:'Temporizador integrado. Em modo astável oscila sozinho com f = 1 / (ln2 · (R1 + 2·R2) · C). Em modo monoestável, um nível abaixo de VCC/3 na face lateral liga a saída durante T = ln3 · R1 · C ≈ 1,1 · R1 · C. A face lateral tem um pull-up interno de 10 kΩ; no astável serve de RESET (ligada a GND pára o oscilador). O NE555 precisa de pelo menos 4,5 V, o TLC555 (CMOS) funciona a partir de 2 V.'},
+  lm386:{n:'Amplificador LM386',cat:'ci',t:[['VS',[0]],['OUT',[1]],['GND',[2]],['IN',[3]]],inner:1,p:{gain:20},d:'Amplificador de áudio. A entrada IN é referida a GND e a saída fica centrada em VS/2. O bloco já inclui o condensador de saída de 220 µF, por isso o altifalante liga diretamente entre OUT e GND. Ganho de 20, 50 ou 200; alimentação de 4 a 12 V.'},
   lamp:{n:'Lâmpada',cat:'out',t:[['A',[3]],['B',[1]]],d:'Lâmpada incandescente pequena (25 Ω). Brilha mais quanto maior for a potência.'},
   motor:{n:'Motor',cat:'out',t:[['A',[3]],['B',[1]]],d:'Motor DC. Roda mais depressa com mais tensão e muda de sentido se trocares a polaridade.'},
+  speaker:{n:'Altifalante',cat:'out',t:[['A',[3]],['B',[1]]],d:'Altifalante de 8 Ω. O som é uma aproximação: o simulador calcula o circuito umas centenas de vezes por segundo e não consegue seguir um sinal de áudio passo a passo, por isso toca a frequência do 555 do mesmo circuito com um volume estimado a partir das tensões. Liga o Som para o ouvir.'},
   buzzer:{n:'Besouro',cat:'out',t:[['+',[3]],['−',[1]]],d:'Besouro ativo: apita quando recebe mais de 1,5 V no sentido certo (+ do lado marcado). Liga o Som para o ouvir.'},
 };
 
+const R555=[1000,2200,4700,10000,47000,68000,100000].map(v=>[v,si(v,'Ω')]);
 const PROPS = {
-  resistor:[{k:'r',l:'Resistência',o:[10,47,100,220,330,470,1000,2200,4700,10000,47000,100000].map(v=>[v,si(v,'Ω')])}],
+  mcu2:[{k:'prog',l:'Programa',o:[['peao','Semáforo com botão de peão (D10, D9, D8; botão em D2)'],['auto','Semáforo automático (D10, D9, D8)'],['noturna','Luz noturna: A0 < 2,5 V acende D7'],['pisca','Pisca em D7 (1 Hz)']]},{k:'v',l:'Tensão das saídas',o:[[5,'5 V (Arduino Uno)'],[3.3,'3,3 V (ESP32, STM32)']]}],
+  mcu3:[{k:'prog',l:'Programa',o:[['peao','Semáforo com botão de peão'],['auto','Semáforo automático']]},{k:'v',l:'Tensão das saídas',o:[[5,'5 V (Arduino Uno)'],[3.3,'3,3 V (ESP32, STM32)']]}],
+  ne555:[{k:'mode',l:'Modo',o:[['ast','Astável (R1, R2 e C internos)'],['ext','Astável, R externa entre OUT e a face lateral'],['mono','Monoestável (temporizador)']]},{k:'kind',l:'Circuito',o:[['ne','NE555 (bipolar, 4,5–16 V)'],['tlc','TLC555 (CMOS, 2–15 V)']]},{k:'r1',l:'R1',o:R555},{k:'r2',l:'R2 (só no astável com R internas)',o:R555},{k:'c',l:'C',o:[1e-8,1e-7,1e-6,10e-6,47e-6,100e-6].map(v=>[v,si(v,'F')])}],
+  lm386:[{k:'gain',l:'Ganho',o:[[20,'× 20 (pinos 1 e 8 abertos)'],[50,'× 50 (1,2 kΩ + 10 µF entre 1 e 8)'],[200,'× 200 (10 µF entre 1 e 8)']]}],
+  resistor:[{k:'r',l:'Resistência',o:[10,47,100,220,330,470,1000,2200,4700,10000,47000,100000,130000,150000,160000,180000,200000,220000,240000,270000].map(v=>[v,si(v,'Ω')])}],
   led:[{k:'color',l:'Cor',o:Object.entries(LEDC).map(([k,v])=>[k,v.n+' ('+num(v.vf,2)+' V)'])}],
   capacitor:[{k:'c',l:'Capacidade',o:[10e-6,100e-6,470e-6,1000e-6,2200e-6].map(v=>[v,si(v,'F')])}],
   battery:[{k:'v',l:'Tensão',o:[[3.7,'3,7 V (Li-ion)'],[5,'5 V'],[9,'9 V']]}],
-  pot:[{k:'r',l:'Resistência total',o:[1000,10000,100000].map(v=>[v,si(v,'Ω')])},{k:'pos',l:'Posição do cursor',range:1,f:v=>Math.round(v*100)+' %'}],
+  pot:[{k:'r',l:'Resistência total',o:[1000,10000,100000,250000].map(v=>[v,si(v,'Ω')])},{k:'pos',l:'Posição do cursor',range:1,f:v=>Math.round(v*100)+' %'}],
   ldr:[{k:'light',l:'Luz ambiente',range:1,f:v=>luxTxt(v)+' → '+si(ldrR(v),'Ω')}],
   mcu:[{k:'hz',l:'Frequência',o:[[0.5,'0,5 Hz'],[1,'1 Hz'],[2,'2 Hz'],[5,'5 Hz']]}],
 };
@@ -236,6 +246,12 @@ const PROPS = {
 function ldrLux(s){ return Math.pow(10,5*s-2); }
 function luxTxt(s){ const v=ldrLux(s); return (v<1?v.toFixed(2):v<10?v.toFixed(1):String(Math.round(v))).replace('.',',')+' lx'; }
 function ldrR(s){ return Math.min(1e6,Math.max(100,1e4*Math.pow(ldrLux(s)/10,-0.7))); }
+
+/* 555: limiares 1/3 e 2/3 de VCC; saída alta = VCC − queda, resistência de saída rout */
+const K555={ne:{vmin:4.5,drop:1.7,rout:10,rq:1000,rst:0.7,n:'NE555'},tlc:{vmin:2,drop:0.05,rout:40,rq:30000,rst:0.7,n:'TLC555'}};
+function f555(p){ return 1/(Math.LN2*(p.r1+2*p.r2)*p.c); }
+function t555(p){ return Math.log(3)*p.r1*p.c; }
+function hz(f){ return f<1000 ? (f<10?num(f,2):f<100?num(f,1):String(Math.round(f)))+' Hz' : si(f,'Hz'); }
 
 /* ============ Formatação ============ */
 function num(v,d){ return v.toFixed(d).replace('.',','); }
@@ -260,13 +276,16 @@ let state = {blocks:[], nextId:1};
 let sel = null, mode = 'edit', tool = null, showV = true, sound = false, paused = false, zoom = 1;
 let undoS = [], redoS = [];
 let topo = null, topoDirty = true;
-const rt = {V:new Float64Array(0), t:0, vc:new Map(), vd:new Map(), out:new Map(), pressed:new Set(), ang:new Map(), burnT:new Map(), warns:[], iters:0, conv:true};
+const rt = {V:new Float64Array(0), t:0, s555:new Map(), mcu:new Map(), vc:new Map(), vd:new Map(), out:new Map(), pressed:new Set(), ang:new Map(), burnT:new Map(), warns:[], iters:0, conv:true};
 let hover = null, drag = null, ptr = null;
 
 const $ = id => document.getElementById(id);
 const key = (x,y) => x+','+y;
 const byId = id => state.blocks.find(b=>b.id===id);
-const at = (x,y) => state.blocks.find(b=>b.x===x&&b.y===y);
+const SZ = t => (TYPES[t]&&TYPES[t].sz)||1;
+const at = (x,y) => state.blocks.find(b=>{ const n=SZ(b.type); return x>=b.x&&x<b.x+n&&y>=b.y&&y<b.y+n; });
+function cellsOf(b){ const n=SZ(b.type), r=[]; for(let j=0;j<n;j++) for(let i=0;i<n;i++) r.push([b.x+i,b.y+j]); return r; }
+function fits(type,x,y,ignore){ const n=SZ(type); for(let j=0;j<n;j++) for(let i=0;i<n;i++){ const X=x+i,Y=y+j; if(!inGrid(X,Y)) return false; const q=at(X,Y); if(q&&q!==ignore) return false; } return true; }
 const inGrid = (x,y) => x>=0&&y>=0&&x<GW&&y<GH;
 
 function mk(type,x,y,rot=0,props){
@@ -279,33 +298,43 @@ function save(){ try{ localStorage.setItem('criETiva-bancada-v1', JSON.stringify
 
 /* face base -> face no tabuleiro */
 function xf(bf,b){ let f=bf; if(b.flip&&(f===1||f===3)) f=4-f; return (f+b.rot)%4; }
-function faceTerm(b,f){
+/* porto base -> [cx, cy, face] no tabuleiro. Blocos 1×1: número da face; blocos 2×2: [cx, cy, face] */
+function xport(bp,b){
+  if(typeof bp==='number') return [0,0,xf(bp,b)];
+  let [cx,cy,f]=bp;
+  if(b.flip){ cx=1-cx; if(f===1||f===3) f=4-f; }
+  for(let k=0;k<b.rot;k++){ const t=cx; cx=1-cy; cy=t; f=(f+1)%4; }
+  return [cx,cy,f];
+}
+function portAt(b,cx,cy,f){
   const T=TYPES[b.type];
-  for(let i=0;i<T.t.length;i++) for(const bf of T.t[i][1]) if(xf(bf,b)===f) return i;
+  for(let i=0;i<T.t.length;i++) for(const bp of T.t[i][1]){ const q=xport(bp,b); if(q[0]===cx&&q[1]===cy&&q[2]===f) return i; }
   return -1;
 }
 
 /* ============ Topologia ============ */
 function buildTopo(){
-  const occ=new Map(); state.blocks.forEach(b=>occ.set(key(b.x,b.y),b));
+  const occ=new Map(); state.blocks.forEach(b=>cellsOf(b).forEach(([x,y])=>occ.set(key(x,y),b)));
   const par=new Map();
   const find=k=>{ while(par.get(k)!==k){ par.set(k,par.get(par.get(k))); k=par.get(k);} return k; };
   const uni=(a,b)=>{ a=find(a); b=find(b); if(a!==b) par.set(a,b); };
   for(const b of state.blocks) TYPES[b.type].t.forEach((_,i)=>par.set(b.id+':'+i, b.id+':'+i));
   const links=[], conn=new Set();
   for(const b of state.blocks){
-    for(let f=0;f<4;f++){
-      const ti=faceTerm(b,f); if(ti<0) continue;
-      const nb=occ.get(key(b.x+DIR[f][0], b.y+DIR[f][1])); if(!nb) continue;
-      const tj=faceTerm(nb,(f+2)%4); if(tj<0) continue;
+    TYPES[b.type].t.forEach((t,ti)=>t[1].forEach(bp=>{
+      const [cx,cy,f]=xport(bp,b), X=b.x+cx, Y=b.y+cy, NX=X+DIR[f][0], NY=Y+DIR[f][1];
+      const nb=occ.get(key(NX,NY)); if(!nb||nb===b) return;
+      const tj=portAt(nb,NX-nb.x,NY-nb.y,(f+2)%4); if(tj<0) return;
       uni(b.id+':'+ti, nb.id+':'+tj);
-      conn.add(b.id+':'+f);
-      if(f===1||f===2) links.push({x:b.x,y:b.y,f});
-    }
+      conn.add(b.id+':'+cx+','+cy+','+f);
+      if(f===1||f===2) links.push({x:X,y:Y,f});
+    }));
   }
   const idx=new Map(); let n=0; const tn=new Map();
   for(const b of state.blocks){
-    tn.set(b.id, TYPES[b.type].t.map((_,i)=>{ const r=find(b.id+':'+i); if(!idx.has(r)) idx.set(r,n++); return idx.get(r); }));
+    const arr=TYPES[b.type].t.map((_,i)=>{ const r=find(b.id+':'+i); if(!idx.has(r)) idx.set(r,n++); return idx.get(r); });
+    for(let k=0;k<(TYPES[b.type].inner||0);k++) arr.push(n++);
+    tn.set(b.id, arr);
   }
   // componentes ligadas -> referência (0 V)
   const cp=[...Array(n).keys()];
@@ -313,11 +342,12 @@ function buildTopo(){
   for(const b of state.blocks){ const nd=tn.get(b.id); for(let i=1;i<nd.length;i++){ const a=cf(nd[0]), c=cf(nd[i]); if(a!==c) cp[a]=c; } }
   const ref=new Map(), hasSrc=new Set();
   for(const b of state.blocks){ if(b.type==='battery'){ const r=cf(tn.get(b.id)[0]); hasSrc.add(r); if(!ref.has(r)) ref.set(r, tn.get(b.id)[0]); } }
-  for(const b of state.blocks){ if(b.type==='mcu'){ const r=cf(tn.get(b.id)[0]); hasSrc.add(r); if(!ref.has(r)) ref.set(r, tn.get(b.id)[0]); } }
+  for(const b of state.blocks){ if(b.type==='mcu'||b.type==='mcu3'||b.type==='mcu2'){ const r=cf(tn.get(b.id)[0]); hasSrc.add(r); if(!ref.has(r)) ref.set(r, tn.get(b.id)[0]); } }
   for(let i=0;i<n;i++){ const r=cf(i); if(!ref.has(r)) ref.set(r,i); }
   const ground=new Set(ref.values());
   const live=new Uint8Array(n); for(let i=0;i<n;i++) live[i]=hasSrc.has(cf(i))?1:0;
-  topo={n, tn, links, conn, ground, live};
+  const comp=new Int32Array(n); for(let i=0;i<n;i++) comp[i]=cf(i);
+  topo={n, tn, links, conn, ground, live, comp};
   if(rt.V.length!==n) rt.V=new Float64Array(n);
   topoDirty=false;
 }
@@ -337,11 +367,23 @@ function diodePar(b){
 }
 const BJT={Is:1e-14, bf:200, br:2};
 
-function step(h){
+/* Passo com subdivisão: se o Newton não convergir (comutações regenerativas, p. ex. multivibrador),
+   repete o intervalo em 4 subpassos, até 4 níveis (h/256). */
+function step(h,depth=0){
+  if(!topo||!topo.n) return;
+  const V0=rt.V.slice(), vd0=new Map(rt.vd), s0=new Map([...rt.s555].map(([k,v])=>[k,Object.assign({},v)]));
+  stepOnce(h);
+  if(!rt.conv && depth<4){
+    rt.V=V0; rt.vd=vd0; rt.s555=s0;
+    for(let k=0;k<4;k++) step(h/4,depth+1);
+  }
+}
+function stepOnce(h){
   const n=topo.n; if(!n) return;
   let V=rt.V;
   const blocks=state.blocks, tn=topo.tn;
-  const hasNL=blocks.some(b=>(b.type==='led'&&!b.props.burned)||b.type==='diode'||b.type==='npn');
+  for(const b of blocks){ if(b.type==='ne555') tick555(b,h); else if(b.type==='mcu3') tickMcu3(b); else if(b.type==='mcu2') tickMcu2(b); }
+  const hasNL=blocks.some(b=>(b.type==='led'&&!b.props.burned)||b.type==='diode'||b.type==='npn'||b.type==='lm386');
   let A, B, it, conv=false;
   const G=(a,b,g)=>{ A[a*n+a]+=g; A[b*n+b]+=g; A[a*n+b]-=g; A[b*n+a]-=g; };
   const inj=(a,i)=>{ B[a]+=i; };
@@ -361,7 +403,42 @@ function step(h){
         case 'lamp': G(nd[0],nd[1],1/25); break;
         case 'motor': G(nd[0],nd[1],1/12); break;
         case 'buzzer': G(nd[0],nd[1],1/200); break;
+        case 'speaker': G(nd[0],nd[1],1/8); break;
+        case 'ne555': {
+          const [vcc,out,g,tr]=nd, k=K555[p.kind]||K555.ne, s=rt.s555.get(b.id)||{};
+          G(vcc,g,1/k.rq); if(p.mode!=='ext') G(vcc,tr,1/10000);
+          const fr=s.pw?(s.frac||0):0, gh=fr/k.rout, gl=s.pw?(1-fr)/k.rout:0;
+          if(gh>0){ G(vcc,out,gh); B[vcc]+=k.drop*gh; B[out]-=k.drop*gh; }
+          if(gl>0) G(out,g,gl);
+          break;
+        }
+        case 'lm386': {
+          const [vs,out,g,inn,X]=nd;
+          G(vs,g,1/1500); G(inn,g,1/50000);
+          const gc=220e-6/h, vp=rt.vc.get(b.id+'cc')||0; G(X,out,gc); inj(X,gc*vp); inj(out,-gc*vp);
+          const vin=V[inn]-V[g], vsu=V[vs]-V[g], A0=p.gain, lo=0.7, hi=vsu-0.7, tl=vsu/2+A0*vin;
+          let T0,a,bb;
+          if(hi<=lo){ T0=Math.max(0,vsu/2); a=0; bb=0.5; }
+          else if(tl>hi){ T0=hi; a=0; bb=1; }
+          else if(tl<lo){ T0=lo; a=0; bb=0; }
+          else { T0=tl; a=A0; bb=0.5; }
+          // corrente que sai de X: gR·(VX − VGND − T), T ≈ T0 + a·Δvin + bb·Δvs
+          const gR=5, c=gR*(-T0+a*vin+bb*vsu), co=[[X,gR],[g,gR*(-1+a+bb)],[inn,-gR*a],[vs,-gR*bb]];
+          lin(X,c,co);
+          const ret = gR*(V[X]-V[g]-T0)<0 ? vs : g;
+          lin(ret,-c,co.map(([q,v])=>[q,-v]));
+          break;
+        }
         case 'battery': { const g=1/0.3; G(nd[0],nd[1],g); inj(nd[1],p.v*g); inj(nd[0],-p.v*g); break; }
+        case 'mcu2': {
+          const s=rt.mcu.get(b.id)||{out:[null,null,null,null]}, g=1/25, gnd=nd[0];
+          G(nd[1],gnd,1/0.2); inj(nd[1],5/0.2); inj(gnd,-5/0.2);
+          [2,3,4,5].forEach((k,i)=>{ const vs=s.out?s.out[i]:null; if(vs===null||vs===undefined) G(nd[k],gnd,1e-8); else { G(nd[k],gnd,g); inj(nd[k],vs*g); inj(gnd,-vs*g); } });
+          G(nd[7],gnd,1/35000); inj(nd[7],5/35000); inj(gnd,-5/35000);
+          G(nd[6],gnd,1e-8);
+          break;
+        }
+        case 'mcu3': { const s=rt.mcu.get(b.id)||{ph:'G'}, g=1/25; [['R',1],['Y',2],['G',3]].forEach(([ph,k])=>{ const vs=s.ph===ph?p.v:0; G(nd[0],nd[k],g); inj(nd[k],vs*g); inj(nd[0],-vs*g); }); break; }
         case 'mcu': { const on=Math.floor(rt.t*p.hz*2)%2===0, vs=on?3.3:0, g=1/20; G(nd[0],nd[1],g); inj(nd[1],vs*g); inj(nd[0],-vs*g); break; }
         case 'capacitor': { const gc=p.c/h, vp=rt.vc.get(b.id)||0; G(nd[0],nd[1],gc); inj(nd[0],gc*vp); inj(nd[1],-gc*vp); break; }
         case 'led': case 'diode': {
@@ -398,7 +475,206 @@ function step(h){
     if(md<1e-7 && it>0 && !lim){ conv=true; break; }
   }
   rt.V=V; rt.iters=it+1; rt.conv=conv;
-  outputs(h);
+  if(conv||h<STEP_MIN) outputs(h);
+}
+
+const RESIST={resistor:p=>p.r, ldr:p=>ldrR(p.light), lamp:()=>25, motor:()=>12, buzzer:()=>200, speaker:()=>8, mcu:()=>20};
+function thev555(b){
+  const n=topo.n, nd=topo.tn.get(b.id), out=nd[1], w=nd[3];
+  const A=new Float64Array(n*n);
+  const G=(a,c,g)=>{ A[a*n+a]+=g; A[c*n+c]+=g; A[a*n+c]-=g; A[c*n+a]-=g; };
+  for(let i=0;i<n;i++) A[i*n+i]+=1e-12;
+  for(const q of state.blocks){
+    const m=topo.tn.get(q.id), p=q.props||{};
+    if(RESIST[q.type]) G(m[0],m[1],1/RESIST[q.type](p));
+    else if(q.type==='pot'){ G(m[0],m[2],1/Math.max(p.r*p.pos,0.5)); G(m[2],m[1],1/Math.max(p.r*(1-p.pos),0.5)); }
+    else if(q.type==='switch') G(m[0],m[1],p.on?100:1e-12);
+    else if(q.type==='button') G(m[0],m[1],rt.pressed.has(q.id)?100:1e-12);
+    else if(q.type==='battery') G(m[0],m[1],1/0.3);
+    else if(q.type==='lm386'){ G(m[3],m[2],1/50000); G(m[0],m[2],1/1500); }
+    else if(q.type==='ne555'&&q!==b){ const k=K555[p.kind]||K555.ne; G(m[0],m[2],1/k.rq); }
+  }
+  const forced=new Set([...topo.ground, out, nd[2]]);
+  const run=(vout,inj)=>{ const M=A.slice(), r=new Float64Array(n); if(inj) r[w]+=1; for(const f of forced){ for(let k=0;k<n;k++) M[f*n+k]=0; M[f*n+f]=1; r[f]= f===out?vout:0; } return solve(M,r,n)[w]; };
+  if(forced.has(w)) return {R:0,a:0};
+  return {R:run(0,true), a:run(1,false)};
+}
+
+function tickMcu2(b){
+  let s=rt.mcu.get(b.id); const p=b.props, nd=topo.tn.get(b.id), V=rt.V;
+  if(!s||s.prog!==p.prog) s={prog:p.prog, ph:'G', t0:rt.t};
+  const d2=(V[nd[7]]||0)-(V[nd[0]]||0), a0=(V[nd[6]]||0)-(V[nd[0]]||0), dt=rt.t-s.t0;
+  s.d2=d2; s.a0=a0; s.btn = s.ready ? d2<1.5 : false; s.ready=true;  // 1.º passo: ainda não há tensões calculadas
+  if(p.prog==='peao'){
+    if(s.ph==='G' && s.btn){ s.ph='Y'; s.t0=rt.t; }
+    else if(s.ph==='Y' && dt>=2){ s.ph='R'; s.t0=rt.t; }
+    else if(s.ph==='R' && dt>=5){ s.ph='G'; s.t0=rt.t; }
+    s.rem={G:0,Y:2,R:5}[s.ph]-(rt.t-s.t0);
+  } else if(p.prog==='auto'){
+    const D={G:4,Y:1.5,R:4}, N={G:'Y',Y:'R',R:'G'};
+    if(dt>=D[s.ph]){ s.ph=N[s.ph]; s.t0=rt.t; }
+    s.rem=D[s.ph]-(rt.t-s.t0);
+  }
+  // níveis das saídas: [D10, D9, D8, D7] (null = entrada, alta impedância)
+  const v=p.v;
+  if(p.prog==='peao'||p.prog==='auto') s.out=[s.ph==='R'?v:0, s.ph==='Y'?v:0, s.ph==='G'?v:0, null];
+  else if(p.prog==='noturna') s.out=[null,null,null, a0<2.5?v:0];
+  else s.out=[null,null,null, Math.floor(rt.t*2)%2===0?v:0];
+  rt.mcu.set(b.id,s);
+}
+
+function tickMcu3(b){
+  let s=rt.mcu.get(b.id); const p=b.props;
+  if(!s||s.prog!==p.prog) s={prog:p.prog, ph:'G', t0:rt.t};
+  const dt=rt.t-s.t0;
+  if(p.prog==='peao'){
+    if(s.ph==='G' && rt.pressed.has(b.id)){ s.ph='Y'; s.t0=rt.t; }
+    else if(s.ph==='Y' && dt>=2){ s.ph='R'; s.t0=rt.t; }
+    else if(s.ph==='R' && dt>=5){ s.ph='G'; s.t0=rt.t; }
+  } else {
+    const D={G:4,Y:1.5,R:4}, N={G:'Y',Y:'R',R:'G'};
+    if(dt>=D[s.ph]){ s.ph=N[s.ph]; s.t0=rt.t; }
+  }
+  s.rem = p.prog==='peao' ? ({G:0,Y:2,R:5}[s.ph]-dt) : ({G:4,Y:1.5,R:4}[s.ph]-dt);
+  rt.mcu.set(b.id,s);
+}
+
+function tick555(b,h){
+  const nd=topo.tn.get(b.id), V=rt.V, p=b.props, k=K555[p.kind]||K555.ne;
+  let s=rt.s555.get(b.id);
+  const vcc=(V[nd[0]]||0)-(V[nd[2]]||0), vtr=(V[nd[3]]||0)-(V[nd[2]]||0);
+  if(!s||s.mode!==p.mode){ s={mode:p.mode, out:p.mode==='ast', u:0, frac:0}; }
+  s.vcc=vcc; s.pw=vcc>=k.vmin;
+  if(!s.pw){ s.out=p.mode==='ast'; s.u=0; s.frac=0; s.trem=0; rt.s555.set(b.id,s); return; }
+  let rem=h, hi=0, n=0;
+  if(p.mode==='mono'){
+    const trig=vtr<vcc/3, tau=p.r1*p.c;
+    while(rem>1e-15 && n++<5000){
+      if(s.out){
+        if(s.u<2/3){ const ts=tau*Math.log((1-s.u)*3); if(ts>=rem){ s.u=1-(1-s.u)*Math.exp(-rem/tau); hi+=rem; rem=0; } else { s.u=2/3; hi+=ts; rem-=ts; } }
+        else if(trig){ hi+=rem; rem=0; }
+        else { s.out=false; s.u=0; }
+      } else if(trig){ s.out=true; s.u=0; } else rem=0;
+    }
+    s.trem = s.out ? Math.max(0,tau*Math.log((1-s.u)*3)) : 0;
+    s.reset=false;
+  } else if(p.mode==='ext'){
+    // f = 1/(tc·ln((a−1/3)/(a−2/3)) + tc·ln2), tc = Rth·C; a = VOH/VCC × α (divisor da rede externa)
+    s.cnt=(s.cnt||0)+1;
+    if(!s.th||s.topo!==topo||s.cnt%6===0){ s.th=thev555(b); s.topo=topo; }
+    const R=s.th.R, al=s.th.a, a=(p.kind==='ne'?Math.max(0,(vcc-k.drop)/vcc):1)*al, tc=R*p.c;
+    s.reset=false; s.stuck=false;
+    if(!(R<1e9)||al<0.01){ hi = s.out?h:0; rem=0; s.fq=0; }
+    else {
+      if(a<=2/3) s.stuck=true;
+      while(rem>1e-15 && n++<4000){
+        if(s.out){ const ts = s.u>=2/3 ? 0 : (a>2/3 ? tc*Math.log((a-s.u)/(a-2/3)) : Infinity); if(ts>=rem){ s.u=a-(a-s.u)*Math.exp(-rem/tc); hi+=rem; rem=0; } else { s.u=2/3; hi+=ts; rem-=ts; s.out=false; } }
+        else { const ts=s.u>1/3?tc*Math.log(s.u*3):0; if(ts>=rem){ s.u=s.u*Math.exp(-rem/tc); rem=0; } else { s.u=1/3; rem-=ts; s.out=true; } }
+      }
+      const tH=a>2/3?tc*Math.log((a-1/3)/(a-2/3)):Infinity, tL=tc*Math.LN2;
+      s.fq = isFinite(tH) ? 1/(tH+tL) : 0; s.D = isFinite(tH) ? tH/(tH+tL) : 1; s.tH=tH; s.tL=tL;
+      if(rem>1e-15) hi+=rem*s.D;
+    }
+  } else {
+    if(vtr<k.rst){ s.out=false; s.u=0; s.reset=true; }
+    else {
+      if(s.reset){ s.reset=false; s.out=true; s.u=0; }
+      const tc=(p.r1+p.r2)*p.c, td=p.r2*p.c;
+      while(rem>1e-15 && n++<4000){
+        if(s.out){ const ts=s.u<2/3?tc*Math.log((1-s.u)*3):0; if(ts>=rem){ s.u=1-(1-s.u)*Math.exp(-rem/tc); hi+=rem; rem=0; } else { s.u=2/3; hi+=ts; rem-=ts; s.out=false; } }
+        else { const ts=s.u>1/3?td*Math.log(s.u*3):0; if(ts>=rem){ s.u=s.u*Math.exp(-rem/td); rem=0; } else { s.u=1/3; rem-=ts; s.out=true; } }
+      }
+      if(rem>1e-15) hi+=rem*(p.r1+p.r2)/(p.r1+2*p.r2);
+    }
+  }
+  if(p.mode==='ast'){ s.fq=s.reset?0:f555(p); s.D=(p.r1+p.r2)/(p.r1+2*p.r2); }
+  if(p.mode==='mono') s.fq=0;
+  s.frac=hi/h;
+  rt.s555.set(b.id,s);
+}
+
+/* Som: análise em regime sinusoidal à frequência fundamental do 555.
+   Fonte: 1.ª harmónica da onda quadrada, A1 = (2·VOH/π)·sin(π·D), atrás de rout.
+   Condensadores jωC; díodos e transístor pelo modelo de pequenos sinais no ponto de funcionamento;
+   LM386 como fonte controlada (ganho G, rout 0,2 Ω) limitada a VS/2 − 0,7 V de amplitude. */
+function csolve(Re,Im,bR,bI,n){
+  for(let c=0;c<n;c++){
+    let p=c, m=Re[c*n+c]**2+Im[c*n+c]**2;
+    for(let r=c+1;r<n;r++){ const v=Re[r*n+c]**2+Im[r*n+c]**2; if(v>m){ m=v; p=r; } }
+    if(m<1e-60){ Re[c*n+c]=1e-30; continue; }
+    if(p!==c){ for(let k=0;k<n;k++){ let t=Re[c*n+k]; Re[c*n+k]=Re[p*n+k]; Re[p*n+k]=t; t=Im[c*n+k]; Im[c*n+k]=Im[p*n+k]; Im[p*n+k]=t; } let t=bR[c]; bR[c]=bR[p]; bR[p]=t; t=bI[c]; bI[c]=bI[p]; bI[p]=t; }
+    const dr=Re[c*n+c], di=Im[c*n+c], dd=dr*dr+di*di;
+    for(let r=c+1;r<n;r++){
+      const ar=Re[r*n+c], ai=Im[r*n+c]; if(ar===0&&ai===0) continue;
+      const fr=(ar*dr+ai*di)/dd, fi=(ai*dr-ar*di)/dd;
+      for(let k=c;k<n;k++){ const xr=Re[c*n+k], xi=Im[c*n+k]; Re[r*n+k]-=fr*xr-fi*xi; Im[r*n+k]-=fr*xi+fi*xr; }
+      const br=bR[c], bi=bI[c]; bR[r]-=fr*br-fi*bi; bI[r]-=fr*bi+fi*br;
+    }
+  }
+  const xr=new Float64Array(n), xi=new Float64Array(n);
+  for(let r=n-1;r>=0;r--){
+    let sr=bR[r], sj=bI[r];
+    for(let k=r+1;k<n;k++){ const ar=Re[r*n+k], ai=Im[r*n+k]; sr-=ar*xr[k]-ai*xi[k]; sj-=ar*xi[k]+ai*xr[k]; }
+    const dr=Re[r*n+r], di=Im[r*n+r], dd=dr*dr+di*di;
+    xr[r]=(sr*dr+sj*di)/dd; xi[r]=(sj*dr-sr*di)/dd;
+  }
+  return [xr,xi];
+}
+function audioUpdate(){
+  if(!topo||!topo.n) return;
+  for(const b of state.blocks) if(b.type==='speaker'||b.type==='lm386'){ const o=rt.out.get(b.id); if(o){ o.vol=0; o.f=0; o.amp=0; } }
+  const n=topo.n, V=rt.V, tn=topo.tn, done=new Set();
+  for(const b5 of state.blocks){
+    if(b5.type!=='ne555') continue;
+    const o5=rt.out.get(b5.id), s5=rt.s555.get(b5.id);
+    if(!o5||!s5||!o5.pw||o5.reset||!(s5.fq>20&&s5.fq<20000)) continue;
+    const comp=topo.comp[tn.get(b5.id)[1]]; if(done.has(comp)) continue; done.add(comp);
+    const f=s5.fq, w=2*Math.PI*f, Re=new Float64Array(n*n), Im=new Float64Array(n*n), bR=new Float64Array(n), bI=new Float64Array(n);
+    const Y=(a,c,g,bb)=>{ Re[a*n+a]+=g; Re[c*n+c]+=g; Re[a*n+c]-=g; Re[c*n+a]-=g; if(bb){ Im[a*n+a]+=bb; Im[c*n+c]+=bb; Im[a*n+c]-=bb; Im[c*n+a]-=bb; } };
+    for(let i=0;i<n;i++) Re[i*n+i]+=1e-9;
+    for(const b of state.blocks){
+      const nd=tn.get(b.id), p=b.props||{};
+      if(RESIST[b.type]){ Y(nd[0],nd[1],1/RESIST[b.type](p)); continue; }
+      switch(b.type){
+        case 'pot': Y(nd[0],nd[2],1/Math.max(p.r*p.pos,0.5)); Y(nd[2],nd[1],1/Math.max(p.r*(1-p.pos),0.5)); break;
+        case 'switch': Y(nd[0],nd[1],p.on?100:1e-9); break;
+        case 'button': Y(nd[0],nd[1],rt.pressed.has(b.id)?100:1e-9); break;
+        case 'battery': Y(nd[0],nd[1],1/0.3); break;
+        case 'capacitor': Y(nd[0],nd[1],0,w*p.c); break;
+        case 'led': case 'diode': { if(p.burned) break; const {Is,nvt}=diodePar(b), vd=V[nd[0]]-V[nd[1]]; Y(nd[0],nd[1],Is*sexp(vd/nvt)/nvt+1e-12); break; }
+        case 'npn': { const o=rt.out.get(b.id), gm=Math.max(0,o?o.ic:0)/VT, [C,Bn,E]=nd; Y(Bn,E,gm/BJT.bf+1e-12); Re[C*n+Bn]+=gm; Re[C*n+E]-=gm; Re[E*n+Bn]-=gm; Re[E*n+E]+=gm; break; }
+        case 'ne555': {
+          const k=K555[p.kind]||K555.ne, [vcc,out,g,tr]=nd;
+          Y(vcc,g,1/k.rq); if(p.mode==='ext') Y(tr,g,0,w*p.c); else Y(vcc,tr,1/10000);
+          Y(out,g,1/k.rout);
+          if(b===b5){ const voh=Math.max(0,o5.vcc-k.drop), A1=2*voh/Math.PI*Math.sin(Math.PI*s5.D); bR[out]+=A1/k.rout; bR[g]-=A1/k.rout; }
+          break;
+        }
+        case 'lm386': {
+          const [vs,out,g,inn,X]=nd, gR=5, A0=p.gain;
+          Y(vs,g,1/1500); Y(inn,g,1/50000); Y(X,out,0,w*220e-6);
+          // corrente que sai de X: gR·(VX − Vg − A0·(Vin − Vg))
+          const co=[[X,gR],[g,gR*(A0-1)],[inn,-gR*A0]];
+          for(const [q,v] of co){ Re[X*n+q]+=v; Re[g*n+q]-=v; }
+          break;
+        }
+      }
+    }
+    for(const g of topo.ground){ for(let k=0;k<n;k++){ Re[g*n+k]=0; Im[g*n+k]=0; } Re[g*n+g]=1; bR[g]=0; bI[g]=0; }
+    const [xr,xi]=csolve(Re,Im,bR,bI,n), mag=(a,c)=>Math.hypot(xr[a]-xr[c],xi[a]-xi[c]);
+    let scale=1;
+    for(const b of state.blocks) if(b.type==='lm386'){
+      const nd=tn.get(b.id); if(topo.comp[nd[3]]!==comp) continue;
+      const o=rt.out.get(b.id), a=mag(nd[4],nd[2]), lim=Math.max(0,o.vs/2-0.7);
+      if(a>lim&&a>0) scale=Math.min(scale,lim/a);
+      o.amp=Math.min(a,lim); o.f=f;
+    }
+    for(const b of state.blocks) if(b.type==='speaker'){
+      const nd=tn.get(b.id); if(topo.comp[nd[0]]!==comp) continue;
+      const o=rt.out.get(b.id), a=mag(nd[0],nd[1])*scale;
+      o.amp=a; o.f=f; o.vol=a>0.005?0.12*Math.min(1,a/2):0;
+    }
+  }
 }
 
 function solve(A,b,n){
@@ -434,7 +710,33 @@ function outputs(h){
       case 'lamp': o.i=v/25; o.p=v*o.i; o.br=Math.min(1,o.p/0.3); break;
       case 'motor': { o.i=v/12; o.p=v*o.i; const sp=Math.max(-1.6,Math.min(1.6,v/3)); o.sp=sp; rt.ang.set(b.id,((rt.ang.get(b.id)||0)+sp*h*900)%360); break; }
       case 'buzzer': o.i=v/200; o.on=v>1.5; break;
+      case 'speaker': { const pr=rt.out.get(b.id); o.i=v/8; o.p=v*o.i; o.vol=pr?pr.vol||0:0; o.f=pr?pr.f||0:0; o.amp=pr?pr.amp||0:0; break; }
+      case 'ne555': {
+        const s=rt.s555.get(b.id)||{}, k=K555[p.kind]||K555.ne;
+        o.vcc=V[nd[0]]-V[nd[2]]; o.vout=V[nd[1]]-V[nd[2]]; o.v=o.vout; o.pw=!!s.pw; o.reset=!!s.reset;
+        o.frac=s.pw?s.frac:0; o.on=o.frac>0.5; o.f=s.pw?(s.fq||0):0; o.trem=s.trem||0; o.th=s.th; o.tH=s.tH; o.tL=s.tL;
+        if(s.pw&&p.mode==='ext'&&s.stuck&&s.th&&s.th.R<1e9) W.push(k.n+': a saída alta (VCC − '+num(k.drop,1)+' V) não chega a 2/3 de VCC, por isso não oscila; escolhe TLC555 ou mais tensão');
+        o.i=(o.frac*(V[nd[0]]-V[nd[1]]-k.drop)-(s.pw?(1-o.frac):0)*o.vout)/k.rout;
+        if(!s.pw && o.vcc>0.5) W.push(k.n+' com '+si(o.vcc,'V')+': precisa de pelo menos '+num(k.vmin,1)+' V'+(p.kind==='ne'?' (usa a bateria de 5 V ou 9 V, ou escolhe TLC555)':''));
+        break;
+      }
+      case 'lm386': {
+        const [vs,out,g,inn,X]=nd;
+        const pr=rt.out.get(b.id); o.vs=V[vs]-V[g]; o.vin=V[inn]-V[g]; o.vx=V[X]-V[g]; o.v=V[out]-V[g]; o.amp=pr?pr.amp||0:0; o.f=pr?pr.f||0:0;
+        rt.vc.set(b.id+'cc',V[X]-V[out]);
+        if(o.vs>0.5&&o.vs<4) W.push('LM386 com '+si(o.vs,'V')+': precisa de 4 a 12 V');
+        if(o.vs>12.5) W.push('LM386 com '+si(o.vs,'V')+': o máximo é 12 V');
+        break;
+      }
       case 'battery': { const vt=V[nd[1]]-V[nd[0]], i=(p.v-vt)/0.3; o.v=vt; o.i=i; o.p=vt*i; if(Math.abs(i)>1.5){ o.short=true; W.push('Curto-circuito na bateria: '+si(Math.abs(i),'A')); } break; }
+      case 'mcu2': {
+        const s=rt.mcu.get(b.id)||{out:[null,null,null,null]}, gnd=nd[0];
+        o.prog=b.props.prog; o.ph=s.ph; o.rem=s.rem; o.btn=s.btn; o.a0=s.a0; o.v5=V[nd[1]]-V[gnd]; o.i5=(5-o.v5)/0.2;
+        o.pins=['D10','D9','D8','D7'].map((nm,i)=>{ const v=V[nd[2+i]]-V[gnd], vs=s.out?s.out[i]:null, ii=(vs===null||vs===undefined)?0:(vs-v)/25; if(Math.abs(ii)>0.04) W.push('Pino '+nm+' a fornecer '+si(Math.abs(ii),'A')+' (máx. 40 mA)'); return {nm,v,i:ii,inp:vs===null||vs===undefined}; });
+        if(o.i5>0.5) W.push('Saída 5V do microcontrolador a fornecer '+si(o.i5,'A')+' (máx. 500 mA)');
+        o.v=0; break;
+      }
+      case 'mcu3': { const s=rt.mcu.get(b.id)||{ph:'G',rem:0}; o.ph=s.ph; o.rem=s.rem; o.pins=[['R',1],['Y',2],['G',3]].map(([ph,k])=>{ const v=V[nd[k]]-V[nd[0]], i=((s.ph===ph?p.v:0)-v)/25; if(Math.abs(i)>0.04) W.push('Pino do microcontrolador a fornecer '+si(Math.abs(i),'A')+' (máx. 40 mA)'); return {v,i}; }); o.v=0; break; }
       case 'mcu': { const on=Math.floor(rt.t*p.hz*2)%2===0; o.on=on; o.v=V[nd[1]]-V[nd[0]]; o.i=((on?3.3:0)-o.v)/20; if(Math.abs(o.i)>0.04) W.push('Saída do microcontrolador a fornecer '+si(Math.abs(o.i),'A')+' (máx. 40 mA)'); break; }
       case 'capacitor': { const vp=rt.vc.get(b.id)||0; o.i=p.c*(v-vp)/h; rt.vc.set(b.id,v); if(v<-1) W.push('Condensador com a polaridade trocada'); break; }
       case 'led': case 'diode': {
@@ -443,7 +745,7 @@ function outputs(h){
         if(b.type==='led'){
           o.br=o.i>2e-5 ? Math.min(1,Math.sqrt(o.i/0.02)) : 0;
           let bt=rt.burnT.get(b.id)||0;
-          if(o.i>0.035) bt+=h*(o.i/0.035); else bt=Math.max(0,bt-h);
+          if(o.i>0.035&&rt.conv) bt+=h*(o.i/0.035); else bt=Math.max(0,bt-h);
           rt.burnT.set(b.id,bt);
           if(bt>0.35){ p.burned=true; rt.burnT.set(b.id,0); topoDirty=true; save(); renderInspector(); }
           else if(o.i>0.03) W.push('LED com '+si(o.i,'A')+': acima de 30 mA vai queimar');
@@ -499,9 +801,28 @@ function sym(b,col,o){
       return two(9)+`<path d="M-9 -10L9 0L-9 10Z" fill="${lc.c}" fill-opacity="${(0.22+0.78*br).toFixed(2)}" stroke="${ink}" stroke-width="2" stroke-linejoin="round"/>`+I('M9 -10V10',2.6)+I('M2 -13L8 -20M5 -20H8V-17',1.4)+I('M8 -10L14 -17M11 -17H14V-14',1.4);
     }
     case 'npn': return `<circle cx="-2" cy="0" r="15" fill="none" stroke="${ink}" stroke-width="1.6"/>`+L('M-27 0H-8',col(1))+I('M-8 -9V9',3)+L('M-8 -4L0 -11V-27',col(0),2.6)+L('M-8 4L0 11V27',col(2),2.6)+`<path d="M-1.2 10.2L-7.4 8.8L-3.6 4.4Z" fill="${ink}"/>`;
+    case 'ne555': { const fr=o?o.frac:0; return L('M0 -27V-14',col(0))+L('M14 0H27',col(1))+L('M0 14V27',col(2))+L('M-27 0H-14',col(3))+`<rect x="-14" y="-14" width="28" height="28" rx="2.5" fill="var(--chip)" stroke="${ink}" stroke-width="1.5"/><path d="M-14 -5A5 5 0 0 1 -14 5" fill="none" stroke="var(--chip-ink)" stroke-width="1.2"/><path d="M-8 5H-4V-3H1V5H5V-3H8" fill="none" stroke="var(--chip-ink)" stroke-width="1.4"/><circle cx="8" cy="-8" r="2.6" fill="#ff5a3c" fill-opacity="${fr.toFixed(2)}" stroke="var(--chip-ink)" stroke-width="1"/>`; }
+    case 'lm386': return L('M-27 0H-12',col(3))+L('M14 0H27',col(1))+L('M0 -27V-7.5',col(0))+L('M0 27V7.5',col(2))+`<path d="M-12 -14L14 0L-12 14Z" fill="var(--chip)" stroke="${ink}" stroke-width="1.6" stroke-linejoin="round"/><path d="M-9 -4H-5M-7 -6V-2M-9 5H-5" stroke="var(--chip-ink)" stroke-width="1.3"/>`;
+    case 'speaker': { const vl=o&&o.vol||0; return L('M-27 0H-10',col(0))+L('M6 0H27',col(1))+`<rect x="-10" y="-6" width="6" height="12" fill="none" stroke="${ink}" stroke-width="1.8"/><path d="M-4 -6L6 -14V14L-4 6Z" fill="var(--accent)" fill-opacity="${Math.min(0.8,vl*8).toFixed(2)}" stroke="${ink}" stroke-width="1.8" stroke-linejoin="round"/>`+(vl>0?I('M10 -18Q15 -12 10 -6',1.4)+I('M14 -22Q21 -12 14 -3',1.4):''); }
     case 'lamp': { const br=o&&o.br||0; return two(11)+`<circle r="11" fill="#ffd54a" fill-opacity="${br.toFixed(2)}" stroke="${ink}" stroke-width="2"/>`+I('M-7.8 -7.8L7.8 7.8M-7.8 7.8L7.8 -7.8',1.8); }
     case 'motor': { const a=rt.ang.get(b.id)||0; return two(12)+`<circle r="12" fill="none" stroke="${ink}" stroke-width="2"/><g transform="rotate(${a.toFixed(1)})">`+I('M0 0V-8M0 0L6.9 4M0 0L-6.9 4',2.4)+'</g>'; }
     case 'buzzer': { const on=o&&o.on; return two(12)+`<circle r="12" fill="none" stroke="${ink}" stroke-width="2"/><circle r="4" fill="${ink}"/>`+(on?I('M-7 -16Q0 -21 7 -16',1.6)+I('M-11 -20Q0 -27 11 -20',1.6):'')+I('M-22 -10H-16M-19 -13V-7',1.4); }
+    case 'mcu2': {
+      // placa: 2×2 quadrículas = −57…57; ligações a meio de cada metade de lado (±30)
+      const out=o&&o.pins?o.pins:[];
+      const ld=(x,y,on,c)=>`<circle cx="${x}" cy="${y}" r="3" fill="${on?c:'none'}" stroke="var(--chip-ink)" stroke-width="1"/>`;
+      return L('M-57 30H-40',col(0))+L('M-57 -30H-40',col(1))+L('M-30 -57V-40',col(2))+L('M30 -57V-40',col(3))+L('M57 -30H40',col(4))+L('M57 30H40',col(5))+L('M30 57V40',col(6))+L('M-30 57V40',col(7))
+        +`<rect x="-40" y="-40" width="80" height="80" rx="5" fill="var(--chip)" stroke="${ink}" stroke-width="1.6"/>`
+        +`<rect x="-22" y="-14" width="44" height="28" rx="2" fill="none" stroke="var(--chip-ink)" stroke-width="1.2"/>`
+        +I('M-16 -14V-19M-8 -14V-19M0 -14V-19M8 -14V-19M16 -14V-19M-16 14V19M-8 14V19M0 14V19M8 14V19M16 14V19',1.1).replace(/var\(--ink\)/g,'var(--chip-ink)')
+        +ld(-30,-30,out[0]&&out[0].v>1,'#ff3b2f')+ld(30,-30,out[1]&&out[1].v>1,'#ffd21f')+ld(30,30,out[2]&&out[2].v>1,'#2fd65b')
+        +`<circle cx="-30" cy="30" r="3" fill="${o&&o.v5>4?'#5fb4d2':'none'}" stroke="var(--chip-ink)" stroke-width="1"/>`;
+    }
+    case 'mcu3': { const ph=o?o.ph:'G', pr=rt.pressed.has(b.id);
+      return L('M-27 0H-13',col(0))+L('M0 -27V-13',col(1))+L('M13 0H27',col(2))+L('M0 13V27',col(3))
+        +`<rect x="-13" y="-13" width="26" height="26" rx="2.5" fill="var(--chip)" stroke="${ink}" stroke-width="1.5"/>`
+        +`<circle cx="-6" cy="-6" r="2.6" fill="${ph==='R'?'#ff3b2f':'none'}" stroke="var(--chip-ink)" stroke-width="1"/><circle cx="0" cy="-6" r="2.6" fill="${ph==='Y'?'#ffd21f':'none'}" stroke="var(--chip-ink)" stroke-width="1"/><circle cx="6" cy="-6" r="2.6" fill="${ph==='G'?'#2fd65b':'none'}" stroke="var(--chip-ink)" stroke-width="1"/>`
+        +`<circle cx="0" cy="5" r="${pr?4:5}" fill="${pr?'var(--accent)':'var(--tile-pas)'}" stroke="var(--chip-ink)" stroke-width="1.3"/>`; }
     case 'mcu': { const on=o&&o.on; return two(13)+`<rect x="-13" y="-13" width="26" height="26" rx="2.5" fill="var(--chip)" stroke="${ink}" stroke-width="1.5"/>`+I('M-7 -13V-18M0 -13V-18M7 -13V-18M-7 13V18M0 13V18M7 13V18',1.5)+`<circle r="4.2" fill="${on?'#ff5a3c':'none'}" stroke="var(--chip-ink)" stroke-width="1.4"/>`; }
   }
   return '';
@@ -514,22 +835,35 @@ function label(b){
     case 'ldr': return luxTxt(p.light);
     case 'battery': return num(p.v, p.v%1?1:0)+' V';
     case 'mcu': return num(p.hz, p.hz%1?1:0)+' Hz';
+    case 'mcu3': return p.prog==='peao'?'D2':'auto';
+    case 'mcu2': return 'MCU · '+num(p.v,p.v%1?1:0)+' V';
     case 'npn': return 'NPN';
+    case 'ne555': return '555';
+    case 'button': return (b.props&&b.props.note)||'';
+    case 'lm386': return '386';
   }
   return '';
 }
 function blockInner(b, ctx){
-  const T=TYPES[b.type], fam=FAM[T.cat];
-  let s=`<rect x="-27" y="-27" width="54" height="54" rx="7" class="tile t-${fam}"${ctx.o&&ctx.o.short?' style="stroke:var(--warn);stroke-width:3"':''}/>`;
+  const T=TYPES[b.type], fam=FAM[T.cat], n=SZ(b.type), H=n*S/2-3;
+  let s=`<rect x="${-H}" y="${-H}" width="${2*H}" height="${2*H}" rx="7" class="tile t-${fam}"${ctx.o&&ctx.o.short?' style="stroke:var(--warn);stroke-width:3"':''}/>`;
   s+=`<g transform="rotate(${b.rot*90}) scale(${b.flip?-1:1} 1)">`+sym(b,ctx.col,ctx.o);
-  T.t.forEach((t,ti)=>t[1].forEach(bf=>{
-    const [px,py]=FACE_PT[bf], c=ctx.conn?ctx.conn(xf(bf,b)):false;
-    const ix=px*0.93, iy=py*0.93, dx=(bf%2===0)?5:0, dy=(bf%2===0)?0:5;
+  T.t.forEach((t,ti)=>t[1].forEach(bp=>{
+    const [cx,cy,f]= typeof bp==='number' ? [0,0,bp] : bp;
+    const ox=(cx-(n-1)/2)*S, oy=(cy-(n-1)/2)*S, [px,py]=FACE_PT[f], c=ctx.conn?ctx.conn(xport(bp,b)):false;
+    const ix=ox+px*0.93, iy=oy+py*0.93, dx=(f%2===0)?5:0, dy=(f%2===0)?0:5;
     const st=c?`fill="var(--gold)"`:`fill="none" stroke="var(--gold)" stroke-width="1"`;
     s+=`<circle cx="${ix-dx}" cy="${iy-dy}" r="1.9" ${st}/><circle cx="${ix+dx}" cy="${iy+dy}" r="1.9" ${st}/>`;
   }));
   s+='</g>';
-  const lb=label(b); if(lb) s+=`<text class="lbl" x="-24" y="-17">${lb}</text>`;
+  if(n>1){
+    // nomes dos pinos, sempre na vertical, junto a cada porto
+    T.t.forEach((t,ti)=>t[1].forEach(bp=>{
+      const [cx,cy,f]=xport(bp,b), ox=(cx-(n-1)/2)*S+FACE_PT[f][0]*0.62, oy=(cy-(n-1)/2)*S+FACE_PT[f][1]*0.62+3;
+      s+=`<text class="lbl" x="${ox}" y="${oy}" text-anchor="middle">${t[0].split(' ')[0]}</text>`;
+    }));
+  }
+  const lb=label(b); if(lb) s+= n>1 ? `<text class="lbl" x="0" y="33" text-anchor="middle" style="fill:var(--chip-ink);opacity:1">${lb}</text>` : `<text class="lbl" x="${-H+3}" y="${-H+10}">${lb}</text>`;
   return s;
 }
 
@@ -557,8 +891,8 @@ function render(){
   for(const b of state.blocks){
     const nd=topo.tn.get(b.id), o=rt.out.get(b.id);
     const col = ti => (showV && nd && topo.live[nd[ti]]) ? vcolor(V[nd[ti]],vmax) : 'var(--trace)';
-    const conn = f => topo.conn.has(b.id+':'+f);
-    s+=`<g transform="translate(${b.x*S+S/2} ${b.y*S+S/2})"${b.id===dragId?' opacity=".35"':''}>`+blockInner(b,{col,o,conn})+'</g>';
+    const conn = q => topo.conn.has(b.id+':'+q.join(',')), n=SZ(b.type);
+    s+=`<g transform="translate(${b.x*S+n*S/2} ${b.y*S+n*S/2})"${b.id===dragId?' opacity=".35"':''}>`+blockInner(b,{col,o,conn})+'</g>';
     if(o&&o.br>0.02){
       const g = b.type==='lamp' ? 'g-lamp' : 'g-'+(b.props.color||'red');
       glow+=`<circle cx="${b.x*S+S/2}" cy="${b.y*S+S/2}" r="${(34+22*o.br).toFixed(1)}" fill="url(#${g})" opacity="${Math.min(1,0.25+o.br).toFixed(2)}" pointer-events="none"/>`;
@@ -571,19 +905,19 @@ function render(){
   }
   let ov='';
   const sb=sel&&byId(sel);
-  if(sb) ov+=`<rect x="${sb.x*S+1}" y="${sb.y*S+1}" width="${S-2}" height="${S-2}" rx="9" fill="none" stroke="var(--accent)" stroke-width="2.5"/>`;
+  if(sb){ const n=SZ(sb.type); ov+=`<rect x="${sb.x*S+1}" y="${sb.y*S+1}" width="${n*S-2}" height="${n*S-2}" rx="9" fill="none" stroke="var(--accent)" stroke-width="2.5"/>`; }
   // fantasma
   if(drag&&drag.moved&&drag.cell){
-    const {x,y}=drag.cell, ok=inGrid(x,y)&&(!at(x,y)||(drag.b&&at(x,y)===drag.b));
-    if(inGrid(x,y)) ov+=`<rect x="${x*S+2}" y="${y*S+2}" width="${S-4}" height="${S-4}" rx="8" fill="none" stroke="${ok?'var(--ok)':'var(--warn)'}" stroke-width="2" stroke-dasharray="5 4"/>`;
+    const ty=drag.kind==='move'?drag.b.type:drag.type, n=SZ(ty), x=drag.cell.x-(drag.off?drag.off.x:0), y=drag.cell.y-(drag.off?drag.off.y:0), ok=fits(ty,x,y,drag.b);
+    if(inGrid(x,y)) ov+=`<rect x="${x*S+2}" y="${y*S+2}" width="${n*S-4}" height="${n*S-4}" rx="8" fill="none" stroke="${ok?'var(--ok)':'var(--warn)'}" stroke-width="2" stroke-dasharray="5 4"/>`;
     const gb = drag.kind==='move' ? drag.b : {type:drag.type, rot:0, flip:false, props:Object.assign({},TYPES[drag.type].p||{})};
     ov+=`<g transform="translate(${drag.px} ${drag.py})" opacity=".8" pointer-events="none">`+blockInner(gb,{col:()=>'var(--trace)',o:null,conn:null})+'</g>';
   }
   if(tool&&ptr&&!drag){
     const {x,y}=ptr;
-    if(inGrid(x,y)&&!at(x,y)){
-      const gb={type:tool,rot:0,flip:false,props:Object.assign({},TYPES[tool].p||{})};
-      ov+=`<g transform="translate(${x*S+S/2} ${y*S+S/2})" opacity=".45" pointer-events="none">`+blockInner(gb,{col:()=>'var(--trace)',o:null,conn:null})+'</g>';
+    if(fits(tool,x,y)){
+      const gb={type:tool,rot:0,flip:false,props:Object.assign({},TYPES[tool].p||{})}, n=SZ(tool);
+      ov+=`<g transform="translate(${x*S+n*S/2} ${y*S+n*S/2})" opacity=".45" pointer-events="none">`+blockInner(gb,{col:()=>'var(--trace)',o:null,conn:null})+'</g>';
     }
   }
   // leitura rápida
@@ -591,7 +925,7 @@ function render(){
   if(hb){
     const t=quick(hb);
     if(t){
-      const w=t.length*6.7+14, cx=Math.min(Math.max(hb.x*S+S/2, w/2), GW*S-w/2), y=hb.y*S-6;
+      const w=t.length*6.7+14, cx=Math.min(Math.max(hb.x*S+SZ(hb.type)*S/2, w/2), GW*S-w/2), y=hb.y*S-6;
       const yy = y<24 ? (hb.y+1)*S+28 : y;
       ov+=`<g pointer-events="none"><rect class="tip-box" x="${cx-w/2}" y="${yy-20}" width="${w}" height="22" rx="6"/><text class="tip-txt" x="${cx}" y="${yy-5}" text-anchor="middle">${t}</text></g>`;
     }
@@ -605,6 +939,9 @@ function quick(b){
     case 'wire': case 'corner': case 'tee': case 'cross': return si(o.v,'V');
     case 'bridge': return '';
     case 'npn': return 'Ic '+si(o.ic,'A')+' · Vce '+si(o.vce,'V');
+    case 'ne555': return o.pw ? ((b.props.mode==='ast'&&o.f>30)?'alta '+Math.round(o.frac*100)+' % do tempo':(o.on?'saída alta':'saída baixa'))+' · '+si(o.vout,'V') : 'sem tensão suficiente';
+    case 'lm386': return 'saída '+si(o.vx,'V')+(o.f?' · '+hz(o.f):'');
+    case 'speaker': return o.vol>0 ? hz(o.f) : si(o.i,'A');
     case 'battery': return si(o.v,'V')+' · '+si(o.i,'A');
     default: return (o.i!==undefined? si(o.i,'A')+' · ':'')+si(o.v,'V');
   }
@@ -617,7 +954,7 @@ function renderPalette(){
     h+=`<div class="pal-sec"><div class="pal-cat"><i class="tk" style="background:var(--tile-${fam})"></i>${name}</div><div class="pal-grid">`;
     for(const [k,T] of Object.entries(TYPES)) if(T.cat===c){
       const b={type:k,rot:0,flip:false,props:Object.assign({},T.p||{})};
-      h+=`<button class="pal-item" data-type="${k}" aria-pressed="false" title="${T.n}"><svg viewBox="-30 -30 60 60">${blockInner(b,{col:()=>'var(--trace)',o:null,conn:null})}</svg><span>${T.n}</span></button>`;
+      h+=`<button class="pal-item" data-type="${k}" aria-pressed="false" title="${T.n}"><svg viewBox="${SZ(k)>1?"-60 -60 120 120":"-30 -30 60 60"}">${blockInner(b,{col:()=>'var(--trace)',o:null,conn:null})}</svg><span>${T.n}</span></button>`;
     }
     h+='</div></div>';
   }
@@ -647,13 +984,13 @@ board.addEventListener('pointerdown',e=>{
     return;
   }
   if(tool){
-    if(inGrid(x,y)&&!b){ commit(); const nb=mk(tool,x,y); state.blocks.push(nb); sel=nb.id; changed(); }
+    if(!b&&fits(tool,x,y)){ commit(); const nb=mk(tool,x,y); state.blocks.push(nb); sel=nb.id; changed(); }
     else if(b){ sel=b.id; renderInspector(); }
     return;
   }
   if(b){
     sel=b.id; renderInspector();
-    drag={kind:'move', b, sx:e.clientX, sy:e.clientY, moved:false, px:p.x, py:p.y, cell:{x,y}};
+    drag={kind:'move', b, sx:e.clientX, sy:e.clientY, moved:false, px:p.x, py:p.y, cell:{x,y}, off:{x:x-b.x, y:y-b.y}};
     board.setPointerCapture(e.pointerId);
   } else { sel=null; renderInspector(); }
 });
@@ -661,7 +998,7 @@ board.addEventListener('pointermove',e=>{
   const p=svgPt(e.clientX,e.clientY), x=Math.floor(p.x/S), y=Math.floor(p.y/S);
   hover = inGrid(x,y)?{x,y}:null; ptr=hover;
   const hb=hover&&at(x,y);
-  board.style.cursor = mode==='test' ? (hb&&['switch','button','pot','ldr'].includes(hb.type)?'pointer':'default') : (tool?'copy':(hb?'grab':'default'));
+  board.style.cursor = mode==='test' ? (hb&&['switch','button','pot','ldr','mcu3'].includes(hb.type)?'pointer':'default') : (tool?'copy':(hb?'grab':'default'));
 });
 board.addEventListener('pointerleave',()=>{ hover=null; ptr=null; });
 board.addEventListener('dblclick',e=>{
@@ -684,12 +1021,12 @@ function endDrag(e,cancel){
     if(!d.moved && !cancel){ setTool(tool===d.type?null:d.type); return; }
     if(cancel||!d.cell) return;
     const {x,y}=d.cell;
-    if(inGrid(x,y)&&!at(x,y)){ commit(); const nb=mk(d.type,x,y); state.blocks.push(nb); sel=nb.id; changed(); }
+    if(fits(d.type,x,y)){ commit(); const nb=mk(d.type,x,y); state.blocks.push(nb); sel=nb.id; changed(); }
     return;
   }
   if(d.kind==='move'&&d.moved&&!cancel){
-    const {x,y}=d.cell;
-    if(inGrid(x,y)&&!at(x,y)){ commit(); d.b.x=x; d.b.y=y; changed(); }
+    const x=d.cell.x-d.off.x, y=d.cell.y-d.off.y;
+    if(fits(d.b.type,x,y,d.b)){ commit(); d.b.x=x; d.b.y=y; changed(); }
   }
 }
 window.addEventListener('pointerup',e=>endDrag(e,false));
@@ -697,7 +1034,7 @@ window.addEventListener('pointercancel',e=>endDrag(e,true));
 
 function interact(b,e,p){
   if(b.type==='switch'){ b.props.on=!b.props.on; save(); renderInspector(); }
-  else if(b.type==='button'){ rt.pressed.add(b.id); drag={kind:'press'}; }
+  else if(b.type==='button'||b.type==='mcu3'){ rt.pressed.add(b.id); drag={kind:'press'}; }
   else if(b.type==='pot'||b.type==='ldr'){ const k=b.type==='pot'?'pos':'light'; drag={kind:'pot', id:b.id, k, x0:p.x, p0:b.props[k]}; board.setPointerCapture(e.pointerId); }
 }
 
@@ -705,14 +1042,14 @@ function interact(b,e,p){
 function rotate(){ const b=sel&&byId(sel); if(!b) return; commit(); b.rot=(b.rot+1)%4; changed(); }
 function flip(){ const b=sel&&byId(sel); if(!b) return; commit(); b.flip=!b.flip; changed(); }
 function del(){ const b=sel&&byId(sel); if(!b) return; commit(); state.blocks=state.blocks.filter(x=>x!==b); sel=null; changed(); }
-function nudge(dx,dy){ const b=sel&&byId(sel); if(!b) return; const x=b.x+dx,y=b.y+dy; if(inGrid(x,y)&&!at(x,y)){ commit(); b.x=x; b.y=y; changed(); } }
+function nudge(dx,dy){ const b=sel&&byId(sel); if(!b) return; const x=b.x+dx,y=b.y+dy; if(fits(b.type,x,y,b)){ commit(); b.x=x; b.y=y; changed(); } }
 function undo(){ if(!undoS.length) return; redoS.push(JSON.stringify(state)); state=JSON.parse(undoS.pop()); sel=null; changed(); }
 function redo(){ if(!redoS.length) return; undoS.push(JSON.stringify(state)); state=JSON.parse(redoS.pop()); sel=null; changed(); }
 function setMode(m){
   mode=m; $('m-edit').setAttribute('aria-pressed',String(m==='edit')); $('m-test').setAttribute('aria-pressed',String(m==='test'));
   if(m==='test') setTool(null); else renderInspector();
 }
-function resetSim(){ rt.t=0; rt.vc.clear(); rt.vd.clear(); rt.burnT.clear(); rt.V=new Float64Array(topo?topo.n:0); }
+function resetSim(){ rt.t=0; rt.mcu.clear(); rt.s555.clear(); rt.vc.clear(); rt.vd.clear(); rt.burnT.clear(); rt.V=new Float64Array(topo?topo.n:0); }
 
 document.addEventListener('keydown',e=>{
   const tg=e.target.tagName; if(tg==='INPUT'||tg==='SELECT'||tg==='TEXTAREA') return;
@@ -758,7 +1095,7 @@ function renderInspector(){
   if(b.type==='led'&&b.props.burned) h+=`<button class="btn" id="a-fix">Reparar LED</button>`;
   if(mode==='edit') h+=`<button class="btn" id="a-rot">Rodar</button><button class="btn" id="a-flip">Espelhar</button><button class="btn danger" id="a-del">Apagar</button>`;
   h+='</div>';
-  h+=`<p class="pal-hint" style="margin-top:12px">Terminais: ${T.t.map(t=>t[0]).filter(Boolean).join(' · ')||'um único nó'}</p>`;
+  h+=`<p class="pal-hint" style="margin-top:12px">Terminais: ${T.t.map(t=>(b.type==='ne555'&&t[0]==='TRIG'&&b.props.mode!=='mono')?(b.props.mode==='ext'?'TRIG/THRESH (C interno)':'RESET'):t[0]).filter(Boolean).join(' · ')||'um único nó'}</p>`;
   el.innerHTML=h;
   for(const d of PROPS[b.type]||[]){
     const inp=$('p-'+d.k);
@@ -783,8 +1120,39 @@ function renderReadings(){
     case 'wire': case 'corner': case 'tee': case 'cross': R.push(['Tensão no nó',si(o.v,'V')]); break;
     case 'bridge': R.push(['Tensão (horizontal)',si(rt.V[nd[0]],'V')],['Tensão (vertical)',si(rt.V[nd[1]],'V')]); break;
     case 'battery': R.push(['Tensão aos terminais',si(o.v,'V')],['Corrente fornecida',si(o.i,'A')],['Potência',si(o.p,'W')]); break;
+    case 'mcu2': {
+      const nm={R:'vermelho',Y:'amarelo',G:'verde'};
+      if(o.prog==='peao'||o.prog==='auto'){ R.push(['Semáforo',nm[o.ph]||'—']); if(o.rem>0) R.push(['Muda daqui a',num(o.rem,1)+' s']); else R.push(['À espera','botão em D2']); }
+      R.push(['D2 (botão)',o.btn?'LOW · carregado':'HIGH · solto'],['A0',si(o.a0,'V')],['5V',si(o.v5,'V')+' · '+si(o.i5,'A')]);
+      o.pins.forEach(q=>R.push([q.nm,q.inp?'entrada':si(q.v,'V')+' · '+si(q.i,'A')]));
+      break;
+    }
+    case 'mcu3': { const nm={R:'vermelho',Y:'amarelo',G:'verde'}; R.push(['Estado',nm[o.ph]]); if(o.rem>0) R.push(['Muda daqui a',num(o.rem,1)+' s']); else R.push(['À espera','botão do peão (D2)']); ['D10 · vermelho','D9 · amarelo','D8 · verde'].forEach((n,i)=>R.push([n,si(o.pins[i].v,'V')+' · '+si(o.pins[i].i,'A')])); break; }
     case 'mcu': R.push(['Saída OUT',o.on?'ligada':'desligada'],['Tensão OUT',si(o.v,'V')],['Corrente',si(o.i,'A')]); break;
     case 'npn': R.push(['Corrente de coletor',si(o.ic,'A')],['Corrente de base',si(o.ib,'A')],['V base-emissor',si(o.vbe,'V')],['V coletor-emissor',si(o.vce,'V')],['Região',o.reg]); if(o.ib>1e-7&&o.reg==='ativa') R.push(['Ganho Ic/Ib',Math.round(o.ic/o.ib)]); break;
+    case 'ne555': {
+      const p=b.props;
+      R.push(['Alimentação',si(o.vcc,'V')]);
+      if(!o.pw){ R.push(['Estado','sem tensão suficiente']); break; }
+      if(p.mode==='ast'){
+        const th=Math.LN2*(p.r1+p.r2)*p.c, tl=Math.LN2*p.r2*p.c;
+        R.push(['Frequência',hz(1/(th+tl))],['Tempo alto',si(th,'s')],['Tempo baixo',si(tl,'s')],['Ciclo de trabalho',num(100*th/(th+tl),1)+' %']);
+        if(o.reset) R.push(['Estado','RESET (face lateral em GND)']);
+        else if(o.f>30) R.push(['Saída média',Math.round(o.frac*100)+' % do tempo alta']);
+        else R.push(['Saída',o.on?'alta':'baixa']);
+      } else if(p.mode==='ext'){
+        const th=o.th||{R:Infinity,a:0};
+        if(!(th.R<1e9)) R.push(['R externa','aberta (nenhuma tecla)'],['Saída',o.on?'alta, parada':'baixa, parada']);
+        else { R.push(['R externa (Thévenin)',si(th.R,'Ω')]); if(o.f>0) R.push(['Frequência',hz(o.f)],['Tempo alto',si(o.tH,'s')],['Tempo baixo',si(o.tL,'s')],['Ciclo de trabalho',num(100*o.tH/(o.tH+o.tL),1)+' %']); else R.push(['Estado','não oscila']); }
+      } else {
+        R.push(['Duração do impulso',si(t555(p),'s')],['Saída',o.on?'alta':'baixa']);
+        if(o.on) R.push(['Tempo restante',si(o.trem,'s')]);
+      }
+      R.push(['Tensão OUT',si(o.vout,'V')],['Corrente OUT',si(o.i,'A')]);
+      break;
+    }
+    case 'lm386': R.push(['Alimentação',si(o.vs,'V')],['Entrada (média)',si(o.vin,'V')],['Saída (média)',si(o.vx,'V')],['Ganho','× '+b.props.gain]); if(o.f) R.push(['Sinal de áudio',hz(o.f)],['Amplitude de saída (pico)',si(o.amp,'V')+(o.amp>=o.vs/2-0.71?' (a cortar)':'')]); break;
+    case 'speaker': R.push(['Corrente (média)',si(o.i,'A')],['Som',o.vol>0?hz(o.f):'silêncio']); if(o.vol>0) R.push(['Amplitude (pico)',si(o.amp,'V')],['Potência média',si(o.amp*o.amp/16,'W')]); break;
     case 'pot': R.push(['Tensão A–B',si(o.v,'V')],['Tensão cursor–B',si(o.vw,'V')],['Corrente em A',si(o.i,'A')]); break;
     case 'capacitor': R.push(['Tensão',si(o.v,'V')],['Corrente',si(o.i,'A')],['Carga',si(b.props.c*Math.abs(o.v),'C')]); break;
     default:
@@ -811,23 +1179,37 @@ function renderStatus(){
 function updateButtons(){ $('b-undo').disabled=!undoS.length; $('b-redo').disabled=!redoS.length; }
 
 /* ============ Som ============ */
-let actx=null, osc=null, gain=null;
+let actx=null; const voices={};
+function voice(k){ if(!voices[k]){ const o=actx.createOscillator(), g=actx.createGain(); o.type='square'; g.gain.value=0; o.connect(g).connect(actx.destination); o.start(); voices[k]={o,g}; } return voices[k]; }
 function soundTick(){
-  const want = sound && state.blocks.some(b=>b.type==='buzzer'&&rt.out.get(b.id)&&rt.out.get(b.id).on);
   if(!actx) return;
-  gain.gain.setTargetAtTime(want?0.05:0, actx.currentTime, 0.01);
+  const t=actx.currentTime;
+  const bz = sound && state.blocks.some(b=>b.type==='buzzer'&&rt.out.get(b.id)&&rt.out.get(b.id).on);
+  const v1=voice('bz'); v1.o.frequency.setValueAtTime(2400,t); v1.g.gain.setTargetAtTime(bz?0.05:0,t,0.01);
+  let best=null;
+  if(sound) for(const b of state.blocks) if(b.type==='speaker'){ const o=rt.out.get(b.id); if(o&&o.vol>0&&(!best||o.vol>best.vol)) best=o; }
+  const v2=voice('sp'); if(best) v2.o.frequency.setTargetAtTime(Math.min(best.f,18000),t,0.005); v2.g.gain.setTargetAtTime(best?best.vol:0,t,0.01);
 }
-function initAudio(){
-  try{
-    actx=new (window.AudioContext||window.webkitAudioContext)();
-    osc=actx.createOscillator(); gain=actx.createGain(); osc.type='square'; osc.frequency.value=2400; gain.gain.value=0;
-    osc.connect(gain).connect(actx.destination); osc.start();
-  }catch(e){ actx=null; }
-}
+function initAudio(){ try{ actx=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){ actx=null; } }
 
 /* ============ Exemplos ============ */
 const B=(t,x,y,r,p)=>[t,x,y,r||0,p];
 const EX={
+  k1:{n:'Circuito 1 · Simples (interruptor + LED)',b:[B('battery',4,4,0,{v:3.7}),B('resistor',5,4,0,{r:220}),B('led',6,4,0,{color:'red'}),B('corner',7,4,1),B('wire',7,5,1),B('corner',7,6,2),B('wire',6,6,0),B('switch',5,6,0,{on:true}),B('wire',4,6,0),B('corner',3,6,3),B('wire',3,5,1),B('corner',3,4,0)]},
+  k2:{n:'Circuito 2 · Potenciómetro regula o brilho',b:[B('battery',3,3,0,{v:3.7}),B('pot',4,3,0,{r:1000,pos:0.3}),B('resistor',4,4,1,{r:100}),B('led',4,5,1,{color:'red'}),B('corner',4,6,2),B('wire',3,6,0),B('corner',2,6,3),B('wire',2,5,1),B('wire',2,4,1),B('corner',2,3,0)]},
+  k3:{n:'Circuito 3 · Dois interruptores, dois LEDs',b:[B('battery',1,4,3,{v:3.7}),B('wire',1,3,1),B('wire',1,2,1),B('corner',1,1,0),B('wire',2,1,0),B('tee',3,1,0),B('wire',4,1,0),B('corner',5,1,1),B('switch',3,2,1,{on:true}),B('resistor',3,3,1,{r:220}),B('led',3,4,1,{color:'red'}),B('wire',3,5,1),B('switch',5,2,1,{on:false}),B('resistor',5,3,1,{r:220}),B('led',5,4,1,{color:'green'}),B('wire',5,5,1),B('wire',1,5,1),B('corner',1,6,3),B('wire',2,6,0),B('tee',3,6,2),B('wire',4,6,0),B('corner',5,6,2)]},
+  k4:{n:'Circuito 4 · Série vs paralelo',b:[B('corner',0,0,0),B('wire',1,0,0),B('battery',2,0,0,{v:5}),B('wire',3,0,0),B('corner',4,0,1),B('wire',0,1,1),B('wire',0,2,1),B('wire',0,3,1),B('wire',0,4,1),B('wire',0,5,1),B('wire',0,6,1),B('wire',0,7,1),B('wire',4,1,1),B('corner',2,2,0),B('wire',3,2,0),B('tee',4,2,2),B('wire',5,2,0),B('corner',6,2,1),B('button',2,3,1),B('button',6,3,1),B('resistor',2,4,1,{r:100}),B('corner',5,4,0),B('cross',6,4,0),B('corner',7,4,1),B('led',2,5,1,{color:'red'}),B('led',2,6,1,{color:'red'}),B('led',2,7,1,{color:'red'}),B('resistor',5,5,1,{r:220}),B('resistor',6,5,1,{r:220}),B('resistor',7,5,1,{r:220}),B('led',5,6,1,{color:'red'}),B('led',6,6,1,{color:'red'}),B('led',7,6,1,{color:'red'}),B('corner',5,7,3),B('cross',6,7,0),B('corner',7,7,2),B('corner',0,8,3),B('wire',1,8,0),B('tee',2,8,2),B('wire',3,8,0),B('wire',4,8,0),B('wire',5,8,0),B('corner',6,8,2)]},
+  k5:{n:'Circuito 5 · LDR: luz de presença',b:[B('corner',0,0,0),B('tee',1,0,0),B('resistor',2,0,0,{r:220}),B('corner',3,0,1),B('wire',0,1,1),B('resistor',1,1,1,{r:10000}),B('led',3,1,1,{color:'green'}),B('battery',0,2,3,{v:3.7}),B('tee',1,2,3),B('resistor',2,2,0,{r:4700}),B('npn',3,2,0),B('wire',0,3,1),B('ldr',1,3,1,{light:0.2}),B('wire',3,3,1),B('corner',0,4,3),B('tee',1,4,2),B('wire',2,4,0),B('corner',3,4,2)]},
+  k6:{n:'Circuito 6 · LED temporizado (condensador + transístor)',b:[B('battery',1,4,3,{v:3.7}),B('wire',1,3,1),B('wire',1,2,1),B('corner',1,1,0),B('wire',2,1,0),B('tee',3,1,0),B('wire',4,1,0),B('wire',5,1,0),B('wire',6,1,0),B('corner',7,1,1),B('button',3,2,1),B('diode',3,3,1),B('tee',3,4,3),B('capacitor',3,5,1,{c:470e-6}),B('wire',3,6,1),B('tee',3,7,2),B('resistor',4,4,0,{r:10000}),B('wire',5,4,0),B('wire',6,4,0),B('resistor',7,2,1,{r:220}),B('led',7,3,1,{color:'red'}),B('npn',7,4,0),B('wire',7,5,1),B('wire',7,6,1),B('corner',7,7,2),B('wire',1,5,1),B('wire',1,6,1),B('corner',1,7,3),B('wire',2,7,0),B('wire',4,7,0),B('wire',5,7,0),B('wire',6,7,0)]},
+  k7:{n:'Circuito 7 · Microcontrolador pisca três LEDs',b:[B('corner',0,0,0),B('wire',1,0,0),B('wire',2,0,0),B('corner',3,0,1),B('wire',0,1,1),B('wire',0,2,1),B('wire',0,3,1),B('wire',0,4,1),B('wire',0,5,1),B('wire',0,6,1),B('wire',0,7,1),B('wire',3,1,1),B('mcu',3,2,1,{hz:0.5}),B('corner',2,3,0),B('cross',3,3,0),B('corner',4,3,1),B('resistor',2,4,1,{r:220}),B('resistor',3,4,1,{r:220}),B('resistor',4,4,1,{r:220}),B('led',2,5,1,{color:'green'}),B('led',3,5,1,{color:'yellow'}),B('led',4,5,1,{color:'red'}),B('corner',2,6,3),B('cross',3,6,0),B('corner',4,6,2),B('wire',3,7,1),B('corner',0,8,3),B('wire',1,8,0),B('wire',2,8,0),B('corner',3,8,2)]},
+  k8:{n:'Circuito 8 · Piano eletrónico (555 + LM386)',b:[B('corner',0,0,0),B('tee',1,0,0),B('wire',2,0,0),B('tee',3,0,0),B('wire',4,0,0),B('wire',5,0,0),B('wire',6,0,0),B('wire',7,0,0),B('wire',8,0,0),B('wire',9,0,0),B('wire',10,0,0),B('wire',11,0,0),B('wire',12,0,0),B('wire',13,0,0),B('tee',14,0,0),B('wire',15,0,0),B('corner',16,0,1),B('corner',0,10,3),B('tee',1,10,2),B('wire',2,10,0),B('tee',3,10,2),B('wire',4,10,0),B('wire',5,10,0),B('wire',6,10,0),B('wire',7,10,0),B('wire',8,10,0),B('wire',9,10,0),B('wire',10,10,0),B('wire',11,10,0),B('wire',12,10,0),B('tee',13,10,2),B('tee',14,10,2),B('tee',15,10,2),B('corner',16,10,2),B('wire',0,1,1),B('wire',0,2,1),B('wire',0,3,1),B('wire',0,4,1),B('battery',0,5,3,{"v": 5}),B('wire',0,6,1),B('wire',0,7,1),B('wire',0,8,1),B('wire',0,9,1),B('capacitor',1,1,1,{"c": 0.0001}),B('wire',1,2,1),B('wire',1,3,1),B('wire',1,4,1),B('wire',1,5,1),B('wire',1,6,1),B('wire',1,7,1),B('wire',1,8,1),B('wire',1,9,1),B('wire',3,1,1),B('ne555',3,2,0,{"mode": "ext", "kind": "tlc", "c": 1e-08}),B('wire',3,3,1),B('wire',3,4,1),B('wire',3,5,1),B('wire',3,6,1),B('bridge',3,7,0),B('wire',3,8,1),B('wire',3,9,1),B('corner',2,2,0),B('wire',2,3,1),B('wire',2,4,1),B('wire',2,5,1),B('wire',2,6,1),B('corner',2,7,3),B('wire',4,7,0),B('tee',4,2,0),B('wire',4,3,1),B('corner',4,4,3),B('tee',5,4,0),B('button',5,5,1,{"note": "Dó"}),B('resistor',5,6,1,{"r": 270000}),B('tee',5,7,2),B('tee',6,4,0),B('button',6,5,1,{"note": "Ré"}),B('resistor',6,6,1,{"r": 240000}),B('tee',6,7,2),B('tee',7,4,0),B('button',7,5,1,{"note": "Mi"}),B('resistor',7,6,1,{"r": 220000}),B('tee',7,7,2),B('tee',8,4,0),B('button',8,5,1,{"note": "Fá"}),B('resistor',8,6,1,{"r": 200000}),B('tee',8,7,2),B('tee',9,4,0),B('button',9,5,1,{"note": "Sol"}),B('resistor',9,6,1,{"r": 180000}),B('tee',9,7,2),B('tee',10,4,0),B('button',10,5,1,{"note": "Lá"}),B('resistor',10,6,1,{"r": 160000}),B('tee',10,7,2),B('tee',11,4,0),B('button',11,5,1,{"note": "Si"}),B('resistor',11,6,1,{"r": 150000}),B('tee',11,7,2),B('corner',12,4,1),B('button',12,5,1,{"note": "Dó'"}),B('resistor',12,6,1,{"r": 130000}),B('corner',12,7,2),B('capacitor',5,2,0,{"c": 1e-05}),B('wire',6,2,0),B('wire',7,2,0),B('wire',8,2,0),B('wire',9,2,0),B('wire',10,2,0),B('wire',11,2,0),B('wire',12,2,0),B('corner',13,2,1),B('tee',13,3,3),B('resistor',13,4,1,{"r": 10000}),B('wire',13,5,1),B('wire',13,6,1),B('wire',13,7,1),B('wire',13,8,1),B('wire',13,9,1),B('wire',14,1,1),B('wire',14,2,1),B('lm386',14,3,0,{"gain": 20}),B('wire',14,4,1),B('wire',14,5,1),B('wire',14,6,1),B('wire',14,7,1),B('wire',14,8,1),B('wire',14,9,1),B('corner',15,3,1),B('speaker',15,4,1),B('wire',15,5,1),B('wire',15,6,1),B('wire',15,7,1),B('wire',15,8,1),B('wire',15,9,1),B('capacitor',16,1,1,{"c": 0.0001}),B('wire',16,2,1),B('wire',16,3,1),B('wire',16,4,1),B('wire',16,5,1),B('wire',16,6,1),B('wire',16,7,1),B('wire',16,8,1),B('wire',16,9,1)]},
+  k9:{n:'Circuito 9 · Piano de potenciómetro (tom contínuo)',b:[B('corner',0,0,0),B('wire',1,0,0),B('tee',2,0,0),B('wire',3,0,0),B('wire',4,0,0),B('wire',5,0,0),B('corner',6,0,1),B('battery',0,1,3,{"v": 5}),B('wire',0,2,1),B('wire',0,3,1),B('wire',0,4,1),B('corner',1,1,0),B('wire',1,2,1),B('wire',1,3,1),B('corner',1,4,3),B('ne555',2,1,0,{"mode": "ext", "kind": "tlc", "c": 1e-08}),B('wire',2,2,1),B('wire',2,3,1),B('bridge',2,4,0),B('tee',3,1,0),B('button',3,2,1,{"note": "Tocar"}),B('resistor',3,3,1,{"r": 130000}),B('pot',3,4,1,{"r": 250000, "pos": 0.5}),B('capacitor',4,1,0,{"c": 1e-05}),B('corner',5,1,1),B('tee',5,2,3),B('resistor',5,3,1,{"r": 10000}),B('wire',5,4,1),B('wire',6,1,1),B('lm386',6,2,0,{"gain": 20}),B('wire',6,3,1),B('wire',6,4,1),B('corner',7,2,1),B('speaker',7,3,1),B('wire',7,4,1),B('corner',0,5,3),B('wire',1,5,0),B('tee',2,5,2),B('wire',3,5,0),B('wire',4,5,0),B('tee',5,5,2),B('tee',6,5,2),B('corner',7,5,2)]},
+  k10:{n:'Circuito 10 · Pisca-pisca dos bombeiros (555)',b:[B('corner',0,0,0),B('tee',1,0,0),B('wire',2,0,0),B('corner',3,0,1),B('wire',0,1,1),B('wire',0,2,1),B('battery',0,3,3,{"v": 5}),B('wire',0,4,1),B('wire',0,5,1),B('corner',0,6,3),B('wire',1,1,1),B('ne555',1,2,0,{"mode": "ast", "kind": "ne", "r1": 10000, "r2": 47000, "c": 1e-05}),B('wire',1,3,1),B('wire',1,4,1),B('wire',1,5,1),B('tee',1,6,2),B('resistor',3,1,1,{"r": 220}),B('led',3,2,1,{"color": "blue"}),B('corner',3,3,2),B('corner',2,2,1),B('tee',2,3,3),B('resistor',2,4,1,{"r": 220}),B('led',2,5,1,{"color": "red"}),B('corner',2,6,2)]},
+  k11:{n:'Circuito 11 · Pisca-pisca só com transístores',b:[B('corner',0,0,0),B('wire',1,0,0),B('tee',2,0,0),B('tee',3,0,0),B('wire',4,0,0),B('tee',5,0,0),B('corner',6,0,1),B('resistor',0,1,1,{"r": 220}),B('led',0,2,1,{"color": "red"}),B('tee',0,3,3),B('wire',0,4,1),B('npn',0,5,0),B('resistor',5,1,1,{"r": 220}),B('led',5,2,1,{"color": "blue"}),B('tee',5,3,1),B('npn',5,4,0),B('wire',5,5,1),B('resistor',2,1,1,{"r": 47000}),B('wire',2,2,1),B('tee',2,3,1),B('resistor',3,1,1,{"r": 47000}),B('wire',3,2,1),B('tee',3,3,3),B('capacitor',1,3,0,{"c": 1e-05}),B('capacitor',4,3,2,{"c": 1e-05}),B('corner',2,4,3),B('bridge',3,4,0),B('wire',4,4,0),B('corner',3,5,2),B('wire',2,5,0),B('wire',1,5,0),B('battery',6,1,3,{"v": 5}),B('wire',6,2,1),B('wire',6,3,1),B('wire',6,4,1),B('wire',6,5,1),B('corner',0,6,3),B('wire',1,6,0),B('wire',2,6,0),B('wire',3,6,0),B('wire',4,6,0),B('tee',5,6,2),B('corner',6,6,2)],flip:[[0, 5]]},
+  k12:{n:'Circuito 12 · Alarme de gaveta (LDR + besouro)',b:[B('corner',0,0,0),B('tee',1,0,0),B('corner',2,0,1),B('battery',0,1,3,{"v": 5}),B('wire',0,2,1),B('wire',0,3,1),B('corner',0,4,3),B('ldr',1,1,1,{"light": 0.1}),B('tee',1,2,3),B('resistor',1,3,1,{"r": 10000}),B('tee',1,4,2),B('buzzer',2,1,1),B('npn',2,2,0),B('wire',2,3,1),B('corner',2,4,2)]},
+  k13:{n:'Circuito 13 · Memória de 1 bit (biestável com 2 transístores)',b:[B('corner',0,0,0),B('wire',1,0,0),B('tee',2,0,0),B('tee',3,0,0),B('wire',4,0,0),B('tee',5,0,0),B('corner',6,0,1),B('resistor',0,1,1,{"r": 220}),B('led',0,2,1,{"color": "red"}),B('tee',0,3,3),B('wire',0,4,1),B('npn',0,5,0),B('resistor',5,1,1,{"r": 220}),B('led',5,2,1,{"color": "blue"}),B('tee',5,3,1),B('npn',5,4,0),B('wire',5,5,1),B('button',2,1,1,{"note": "Azul"}),B('resistor',2,2,1,{"r": 10000}),B('tee',2,3,1),B('button',3,1,1,{"note": "Verm."}),B('resistor',3,2,1,{"r": 10000}),B('tee',3,3,3),B('resistor',1,3,0,{"r": 10000}),B('resistor',4,3,0,{"r": 10000}),B('corner',2,4,3),B('bridge',3,4,0),B('wire',4,4,0),B('corner',3,5,2),B('wire',2,5,0),B('wire',1,5,0),B('battery',6,1,3,{"v": 5}),B('wire',6,2,1),B('wire',6,3,1),B('wire',6,4,1),B('wire',6,5,1),B('corner',0,6,3),B('wire',1,6,0),B('wire',2,6,0),B('wire',3,6,0),B('wire',4,6,0),B('tee',5,6,2),B('corner',6,6,2)],flip:[[0, 5]]},
+  k14:{n:'Circuito 14 · Teremim de luz (555 + LDR + LM386)',b:[B('corner',0,0,0),B('wire',1,0,0),B('tee',2,0,0),B('wire',3,0,0),B('wire',4,0,0),B('wire',5,0,0),B('corner',6,0,1),B('battery',0,1,3,{"v": 5}),B('wire',0,2,1),B('wire',0,3,1),B('wire',0,4,1),B('corner',1,1,0),B('wire',1,2,1),B('wire',1,3,1),B('corner',1,4,3),B('ne555',2,1,0,{"mode": "ext", "kind": "tlc", "c": 1e-07}),B('wire',2,2,1),B('wire',2,3,1),B('bridge',2,4,0),B('tee',3,1,0),B('resistor',3,2,1,{"r": 10000}),B('ldr',3,3,1,{"light": 0.8}),B('corner',3,4,2),B('capacitor',4,1,0,{"c": 1e-05}),B('corner',5,1,1),B('tee',5,2,3),B('resistor',5,3,1,{"r": 10000}),B('wire',5,4,1),B('wire',6,1,1),B('lm386',6,2,0,{"gain": 20}),B('wire',6,3,1),B('wire',6,4,1),B('corner',7,2,1),B('speaker',7,3,1),B('wire',7,4,1),B('corner',0,5,3),B('wire',1,5,0),B('tee',2,5,2),B('wire',3,5,0),B('wire',4,5,0),B('tee',5,5,2),B('tee',6,5,2),B('corner',7,5,2)]},
+  k15:{n:'Circuito 15 · Semáforo com botão de peão (microcontrolador 2×2)',b:[B('mcu2',2,3,0,{"prog": "peao", "v": 5}),B('resistor',2,2,1,{"r": 220}),B('led',2,1,3,{"color": "red"}),B('resistor',3,2,1,{"r": 220}),B('led',3,1,3,{"color": "yellow"}),B('resistor',4,3,0,{"r": 220}),B('led',5,3,0,{"color": "green"}),B('corner',0,0,0),B('wire',1,0,0),B('tee',2,0,0),B('tee',3,0,0),B('wire',4,0,0),B('wire',5,0,0),B('corner',6,0,1),B('wire',6,1,1),B('wire',6,2,1),B('corner',6,3,2),B('wire',0,1,1),B('wire',0,2,1),B('wire',0,3,1),B('corner',0,4,3),B('tee',1,4,0),B('button',1,5,1,{"note": "Peão"}),B('corner',1,6,3),B('corner',2,6,2),B('wire',2,5,1)]},
   led:{n:'LED com resistência',b:[B('battery',4,4,0,{v:3.7}),B('resistor',5,4,0,{r:220}),B('led',6,4,0,{color:'red'}),B('corner',7,4,1),B('wire',7,5,1),B('corner',7,6,2),B('wire',6,6,0),B('switch',5,6,0,{on:true}),B('wire',4,6,0),B('corner',3,6,3),B('wire',3,5,1),B('corner',3,4,0)]},
   burn:{n:'LED sem resistência',b:[B('battery',4,4,0,{v:3.7}),B('wire',5,4,0),B('led',6,4,0,{color:'blue'}),B('corner',7,4,1),B('wire',7,5,1),B('corner',7,6,2),B('wire',6,6,0),B('switch',5,6,0,{on:false}),B('wire',4,6,0),B('corner',3,6,3),B('wire',3,5,1),B('corner',3,4,0)]},
   pot:{n:'Potenciómetro controla o brilho',b:[B('battery',3,3,0),B('pot',4,3,0,{r:10000,pos:0.05}),B('corner',5,3,1),B('wire',5,4,1),B('wire',5,5,1),B('corner',5,6,2),B('resistor',4,4,1,{r:100}),B('led',4,5,1,{color:'green'}),B('tee',4,6,2),B('wire',3,6,0),B('corner',2,6,3),B('wire',2,5,1),B('wire',2,4,1),B('corner',2,3,0)]},
@@ -835,16 +1217,20 @@ const EX={
   cap:{n:'Condensador mantém o LED aceso',b:[B('battery',1,4,3),B('wire',1,3,1),B('wire',1,2,1),B('corner',1,1,0),B('button',2,1,0),B('resistor',3,1,0,{r:100}),B('tee',4,1,0),B('wire',5,1,0),B('corner',6,1,1),B('capacitor',4,2,1,{c:2200e-6}),B('wire',4,3,1),B('wire',4,4,1),B('wire',4,5,1),B('wire',4,6,1),B('tee',4,7,2),B('resistor',6,2,1,{r:220}),B('led',6,3,1,{color:'green'}),B('wire',6,4,1),B('wire',6,5,1),B('wire',6,6,1),B('corner',6,7,2),B('wire',1,5,1),B('wire',1,6,1),B('corner',1,7,3),B('wire',2,7,0),B('wire',3,7,0),B('wire',5,7,0)]},
   mcu:{n:'Microcontrolador a piscar um LED',b:[B('mcu',2,3,0,{hz:1}),B('resistor',3,3,0,{r:220}),B('led',4,3,0,{color:'red'}),B('corner',5,3,1),B('wire',5,4,1),B('corner',5,5,2),B('wire',4,5,0),B('wire',3,5,0),B('wire',2,5,0),B('corner',1,5,3),B('wire',1,4,1),B('corner',1,3,0)]},
   ldr:{n:'LDR: luz de presença (acende no escuro)',b:[B('battery',1,4,3),B('wire',1,3,1),B('wire',1,2,1),B('corner',1,1,0),B('wire',2,1,0),B('tee',3,1,0),B('wire',4,1,0),B('wire',5,1,0),B('corner',6,1,1),B('resistor',6,2,1,{r:220}),B('led',6,3,1,{color:'yellow'}),B('npn',6,4,0),B('wire',6,5,1),B('wire',6,6,1),B('corner',6,7,2),B('resistor',3,2,1,{r:10000}),B('wire',3,3,1),B('tee',3,4,3),B('wire',4,4,0),B('resistor',5,4,0,{r:1000}),B('ldr',3,5,1,{light:0.9}),B('wire',3,6,1),B('tee',3,7,2),B('wire',1,5,1),B('wire',1,6,1),B('corner',1,7,3),B('wire',2,7,0),B('wire',4,7,0),B('wire',5,7,0)]},
+  ne555:{n:'555 a piscar um LED',b:[B('battery',1,4,3,{v:5}),B('wire',1,3,1),B('wire',1,2,1),B('corner',1,1,0),B('wire',2,1,0),B('corner',3,1,1),B('wire',3,2,1),B('ne555',3,3,0,{mode:'ast',r1:10000,r2:68000,c:10e-6}),B('wire',3,4,1),B('wire',3,5,1),B('wire',3,6,1),B('tee',3,7,2),B('resistor',4,3,0,{r:220}),B('led',5,3,0,{color:'red'}),B('corner',6,3,1),B('wire',6,4,1),B('wire',6,5,1),B('wire',6,6,1),B('corner',6,7,2),B('wire',1,5,1),B('wire',1,6,1),B('corner',1,7,3),B('wire',2,7,0),B('wire',4,7,0),B('wire',5,7,0)]},
+  mono:{n:'555 temporizador (luz de escada)',b:[B('battery',1,4,3,{v:5}),B('wire',1,3,1),B('wire',1,2,1),B('corner',1,1,0),B('wire',2,1,0),B('wire',3,1,0),B('corner',4,1,1),B('wire',4,2,1),B('ne555',4,3,0,{mode:'mono',r1:47000,c:100e-6}),B('corner',3,3,0),B('button',3,4,1),B('wire',3,5,1),B('wire',3,6,1),B('tee',3,7,2),B('wire',4,4,1),B('wire',4,5,1),B('wire',4,6,1),B('tee',4,7,2),B('resistor',5,3,0,{r:220}),B('led',6,3,0,{color:'yellow'}),B('corner',7,3,1),B('wire',7,4,1),B('wire',7,5,1),B('wire',7,6,1),B('corner',7,7,2),B('wire',1,5,1),B('wire',1,6,1),B('corner',1,7,3),B('wire',2,7,0),B('wire',5,7,0),B('wire',6,7,0)]},
+  audio:{n:'555 + LM386: tom no altifalante',b:[B('battery',1,4,3,{v:5}),B('wire',1,3,1),B('wire',1,2,1),B('corner',1,1,0),B('wire',2,1,0),B('tee',3,1,0),B('wire',4,1,0),B('wire',5,1,0),B('corner',6,1,1),B('wire',3,2,1),B('ne555',3,3,0,{mode:'ast',r1:1000,r2:4700,c:1e-7}),B('wire',3,4,1),B('wire',3,5,1),B('wire',3,6,1),B('tee',3,7,2),B('wire',4,3,0),B('corner',5,3,1),B('pot',5,4,3,{r:10000,pos:0.03}),B('wire',5,5,1),B('wire',5,6,1),B('tee',5,7,2),B('wire',6,2,1),B('wire',6,3,1),B('lm386',6,4,0,{gain:20}),B('wire',6,5,1),B('wire',6,6,1),B('tee',6,7,2),B('corner',7,4,1),B('speaker',7,5,1),B('wire',7,6,1),B('corner',7,7,2),B('wire',1,5,1),B('wire',1,6,1),B('corner',1,7,3),B('wire',2,7,0),B('wire',4,7,0)]},
   motor:{n:'Motor e lâmpada em paralelo',b:[B('battery',1,4,3,{v:5}),B('wire',1,3,1),B('wire',1,2,1),B('corner',1,1,0),B('switch',2,1,0,{on:true}),B('tee',3,1,0),B('wire',4,1,0),B('corner',5,1,1),B('motor',3,2,1),B('wire',3,3,1),B('wire',3,4,1),B('wire',3,5,1),B('tee',3,6,2),B('lamp',5,2,1),B('wire',5,3,1),B('wire',5,4,1),B('wire',5,5,1),B('corner',5,6,2),B('wire',4,6,0),B('wire',1,5,1),B('corner',1,6,3),B('wire',2,6,0)]},
 };
 function loadExample(k){
   const ex=EX[k]; if(!ex) return;
   commit();
-  const xs=ex.b.map(e=>e[1]), ys=ex.b.map(e=>e[2]);
-  const dx=Math.floor((GW-(Math.max(...xs)-Math.min(...xs)+1))/2)-Math.min(...xs);
-  const dy=Math.floor((GH-(Math.max(...ys)-Math.min(...ys)+1))/2)-Math.min(...ys);
+  const xs=ex.b.map(e=>e[1]), ys=ex.b.map(e=>e[2]), xe=ex.b.map(e=>e[1]+SZ(e[0])-1), ye=ex.b.map(e=>e[2]+SZ(e[0])-1);
+  const dx=Math.floor((GW-(Math.max(...xe)-Math.min(...xs)+1))/2)-Math.min(...xs);
+  const dy=Math.floor((GH-(Math.max(...ye)-Math.min(...ys)+1))/2)-Math.min(...ys);
   state={blocks:[],nextId:1};
   for(const [t,x,y,r,p] of ex.b) state.blocks.push(mk(t,x+dx,y+dy,r,p));
+  if(ex.flip) for(const [fx,fy] of ex.flip){ const q=at(fx+dx,fy+dy); if(q) q.flip=true; }
   sel=null; resetSim(); changed();
 }
 
@@ -857,8 +1243,7 @@ function loadJSON(txt){
     const ok=arr.filter(b=>TYPES[b.type]&&Number.isInteger(b.x)&&Number.isInteger(b.y)&&inGrid(b.x,b.y));
     commit();
     state={blocks:[],nextId:1};
-    const seen=new Set();
-    for(const b of ok){ const k=key(b.x,b.y); if(seen.has(k)) continue; seen.add(k); const nb=mk(b.type,b.x,b.y,(b.rot|0)%4,b.props); nb.flip=!!b.flip; state.blocks.push(nb); }
+    for(const b of ok){ if(!fits(b.type,b.x,b.y)) continue; const nb=mk(b.type,b.x,b.y,(b.rot|0)%4,b.props); nb.flip=!!b.flip; state.blocks.push(nb); }
     sel=null; resetSim(); changed();
     $('j-msg').textContent=`Abertos ${state.blocks.length} blocos.`;
   }catch(e){ $('j-msg').textContent='Não consegui ler este texto como circuito ('+e.message+'). Confirma que copiaste o JSON completo.'; }
@@ -917,7 +1302,7 @@ function frame(t){
   if(topoDirty) buildTopo();
   if(!paused && topo && topo.n){ const sub=3; for(let i=0;i<sub;i++){ step(dt/sub); rt.t+=dt/sub; } }
   render();
-  slow+=dt; if(slow>0.15){ slow=0; renderReadings(); renderStatus(); soundTick(); }
+  slow+=dt; if(slow>0.15){ slow=0; if(!paused) audioUpdate(); renderReadings(); renderStatus(); soundTick(); }
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
